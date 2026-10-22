@@ -24,10 +24,17 @@ cmake --build build --parallel 2
 
 O resultado será `build/libnpclines.so`.
 
-Alternativamente, adicione o conteúdo deste projeto à raiz de um repositório
-GitHub seu, incluindo `.github/workflows/build.yml`. Abra Actions → Build ARM64
-→ Run workflow. Quando terminar, baixe o artefato NPC-Lines-ARM64 e extraia a `.so`.
-A rotina é fornecida; não foi executada nem publicada por esta conversa.
+## Compilar pelo GitHub
+
+O GitHub Actions está configurado em `.github/workflows/build.yml`.
+Abra Actions → Build ARM64 → Run workflow → Run workflow.
+A compilação também inicia quando o código muda na branch main.
+Quando a execução terminar com sucesso, abra a execução e, em Artifacts,
+baixe NPC-Lines-ARM64. Extraia `libnpclines.so` do ZIP.
+Não é necessário instalar o NDK no celular.
+
+O resultado de cada compilação aparece na aba Actions; a configuração do
+workflow não confirma funcionamento dentro do jogo.
 
 ## Instalar e testar
 
@@ -49,8 +56,8 @@ Essa checagem não equivale a validar todas as alterações de outros plugins.
 - Sintaxe de main.cpp validada com GCC do host, em C++14, usando declarações
   mínimas de JNI/Android só para essa checagem. Esses arquivos temporários não
   fazem parte do projeto. Isso NÃO valida a compilação Android ou a ABI em execução.
-- Compilação NDK, instalação, interação com FLA/CLEO e funcionamento no aparelho
-  ainda NÃO testados. O ambiente não tem o NDK e o proxy de rede não ficou acessível.
+- A compilação NDK é verificada pelo workflow; veja o resultado na aba Actions.
+- Instalação, interação com FLA/CLEO e funcionamento no aparelho ainda NÃO testados.
 
 O acesso aos NPCs usa CPools::GetPed para respeitar alterações de alocação do FLA.
 Offsets de posição e vida continuam específicos da biblioteca enviada; não há

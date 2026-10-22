@@ -10,7 +10,12 @@ Hierarchy fakeHierarchy{0,6,bones};
 int mode=4, renders=0, copies=0, frame=0;
 bool cinematic=false, badBone=false, missingHierarchy=false, expectAlignment=false;
 Vec nativePos{2,3,4}, nativeSource{1,2,3}, nativeGame{4,5,6}, nativeFront{0,1,0};
-Basis nativeView{{1,0,0},{0,1,0},{0,0,1}};
+// Deliberately use a reflected internal matrix, unlike the logical CCam basis.
+// Rebuilding these columns from front/up would change handedness and fail this test.
+Basis nativeView{{-1,0,0},{0,1,0},{0,0,1}};
+Basis previousNative=nativeView;
+Vec nativeUp{0,0,1};
+void* aimTarget=fakePlayer;
 Basis initialHead{{0,0,1},{0,1,0},{-1,0,0}};
 bool near(float a,float b) { return std::fabs(a-b)<0.0001f; }
 bool same(Vec a,Vec b) { return near(a.x,b.x)&&near(a.y,b.y)&&near(a.z,b.z); }
@@ -26,7 +31,17 @@ void* clipMock(void* rw,float n) { assert(rw==fakeRw); set(rw,168,n); return rw;
 void copyMock(void* c,bool update) {
     assert(c==fakeCamera && update); ++copies;
     Vec eye{};
-    assert(headcam::eyePosition(bones[1].pos,position(fakePlayer),basis(fakeMatrix),eye));
+    Basis view{};
+    assert(headcam::viewBasis(nativeFront,nativeUp,view));
+    assert(headcam::eyePosition(bones[1].pos,position(fakePlayer),view,eye));
+    // Native axes must be byte-identical even for a nonstandard convention.
+    for(void* m : {static_cast<void*>(fakeMatrix),static_cast<void*>(fakeCamera+2416)}) {
+        assert(std::memcmp(m,&nativeView.right,sizeof(Vec))==0);
+        assert(std::memcmp(static_cast<uint8_t*>(m)+16,&nativeView.forward,sizeof(Vec))==0);
+        assert(std::memcmp(static_cast<uint8_t*>(m)+32,&nativeView.up,sizeof(Vec))==0);
+    }
+    assert(same(get<Vec>(fakeCamera,376+360),nativeFront));
+    assert(same(get<Vec>(fakeCamera,376+396),nativeUp));
     assert(same(get<Vec>(fakeMatrix,48),eye));
     assert(same(get<Vec>(fakeCamera,2464),eye));
 }
@@ -53,7 +68,7 @@ void processMock(void* p) {
         assert(same(get<Vec>(fakeCamera,376+372),nativeSource));
         assert(same(get<Vec>(fakeCamera,2276),nativeGame));
         assert(get<float>(fakeRw,168)==0.9f);
-        assert(same(get<Vec>(fakeMatrix,0),nativeView.right));
+        assert(same(get<Vec>(fakeMatrix,0),previousNative.right));
     }
     set(fakeCamera,49,true); set(fakeCamera,67,cinematic);
     set(fakeCamera,95,uint8_t{0}); set(fakeCamera,24,static_cast<void*>(fakeMatrix));
@@ -64,9 +79,10 @@ void processMock(void* p) {
     }
     set(fakeCamera,376+372,nativeSource); set(fakeCamera,2276,nativeGame);
     set(fakeCamera,376+14,static_cast<int16_t>(mode));
-    set(fakeCamera,376+360,nativeFront); set(fakeCamera,376+396,nativeView.up);
-    set(fakeCamera,376+504,static_cast<void*>(fakePlayer));
+    set(fakeCamera,376+360,nativeFront); set(fakeCamera,376+396,nativeUp);
+    set(fakeCamera,376+504,aimTarget);
     set(fakeRw,168,0.9f);
+    previousNative=nativeView;
 }
 }
 int main() {
@@ -99,14 +115,28 @@ int main() {
     renderPed(fakePlayer);
     mode=4; cinematic=true; processCamera(fakeCamera); assert(!active);
     cinematic=false; badBone=true; processCamera(fakeCamera); assert(!active);
-    badBone=false; missingHierarchy=true; processCamera(fakeCamera); assert(!active);
-    missingHierarchy=false; set(fakePlayer,1708,0.0f); processCamera(fakeCamera); assert(!active);
+    badBone=false; missingHierarchy=true; processCamera(fakeCamera); assert(active);
+    renderPed(fakePlayer); assert(std::memcmp(before,bones,sizeof(bones))==0);
+    // Missing optional render data must not toggle the camera to third person.
+    missingHierarchy=false;
+    // Aim transitions with an enemy target keep the camera at the head.
+    expectAlignment=true;
+    for(int aimMode : {5,53,55}) {
+        mode=aimMode; aimTarget=fakePedMatrix;
+        processCamera(fakeCamera); assert(active);
+        renderPed(fakePlayer); assert(std::memcmp(before,bones,sizeof(bones))==0);
+    }
+    mode=4; aimTarget=fakePlayer;
+    // Preserve native upside-down/rolled orientations as well, without inventing axes.
+    nativeView={{1,0,0},{0,1,0},{0,0,-1}};
+    nativeUp={0,0,-1};
+    processCamera(fakeCamera); assert(active);
+    set(fakePlayer,1708,0.0f); processCamera(fakeCamera); assert(!active);
     Basis view{};
-    assert(!headcam::viewBasis({0,0,0},{0,0,1},{0,0,1},view));
+    assert(!headcam::viewBasis({0,0,0},{0,0,1},view));
     Vec out{};
-    assert(!headcam::eyePosition({0,0,std::numeric_limits<float>::quiet_NaN()},{0,0,0},nativeView,out));
-    assert(headcam::viewBasis({0,1,0},{0,0,1},{1,0,0},view));
-    // Roll is bounded to 15 degrees even when animation leans 90 degrees.
-    assert(near(std::acos(headcam::dot(view.up,Vec{0,0,1})),0.2617994f));
+    assert(headcam::viewBasis({0,1,0},{0,0,1},view));
+    assert(!headcam::eyePosition({0,0,std::numeric_limits<float>::quiet_NaN()},{0,0,0},view,out));
+    assert(same(view.up,Vec{0,0,1}));
     assert(headcam::orthogonal(headcam::headBasis(view)));
 }

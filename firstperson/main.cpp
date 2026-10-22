@@ -5,7 +5,7 @@
 #include <cstring>
 #include "camera_math.h"
 
-MYMOD(local.headcam.sa210, Head Camera SA210 ARM64, 0.2.0, Custom)
+MYMOD(local.headcam.sa210, Head Camera SA210 ARM64, 0.2.1, Custom)
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.4.0)
 END_DEPLIST()
@@ -59,10 +59,6 @@ Vec position(const void* p) {
     return matrix ? get<Vec>(matrix,matrixPos) : get<Vec>(p,8);
 }
 Basis basis(const void* matrix) { return {get<Vec>(matrix,0),get<Vec>(matrix,16),get<Vec>(matrix,32)}; }
-void writeBasis(void* matrix,const Basis& b) {
-    set(matrix,0,b.right); set(matrix,16,b.forward); set(matrix,32,b.up);
-    matrixUpdate(matrix);
-}
 Hierarchy* hierarchy(void* ped) {
     void* clump=get<void*>(ped,pedRwObject);
     if(!clump) return nullptr;
@@ -110,14 +106,17 @@ void processCamera(void* self) {
     if (index>=3) return;
     uint8_t* cam=camera+cameraCams+index*camSize;
     int16_t mode=get<int16_t>(cam,camMode);
-    if (mode!=4 && mode!=18) return; // MODE_FOLLOWPED / MODE_CAM_ON_A_STRING
+    // Walk, follow-car and ordinary aim. Scope/rocket/scripted modes stay native.
+    const bool commonAim=(mode==5 || mode==53 || mode==55);
+    if(mode!=4 && mode!=18 && !commonAim) return;
     void* player=findPlayer(-1);
     if (!player || !get<void*>(player,pedRwObject)) return;
     float health=get<float>(player,pedHealth);
     if (!std::isfinite(health) || health<=0.0f) return;
     void* target=get<void*>(cam,camTarget);
     void* vehicle=get<void*>(player,pedVehicle);
-    if (target!=player && (!vehicle || target!=vehicle)) return;
+    // Aim cameras may store the enemy as target; the view still belongs to CJ.
+    if(!commonAim && target!=player && (!vehicle || target!=vehicle)) return;
     void* matrix=get<void*>(camera,placeableMatrix);
     void* rw=get<void*>(camera,rwCamera);
     if (!matrix || !rw) return;
@@ -125,11 +124,10 @@ void processCamera(void* self) {
     // x0=player, x1=out, w2=bone tag, w3=update skin.
     Vec head{};
     bonePosition(player,head,5,true);
-    RwMatrix* skeletalHead=headMatrix(hierarchy(player));
-    if(!skeletalHead || !headcam::orthogonal(basis(skeletalHead))) return;
     Vec eye{}; Basis view{};
-    // In the head's skeletal matrix, the first column is the visual head-up axis.
-    if(!headcam::viewBasis(get<Vec>(cam,camFront),get<Vec>(matrix,32),skeletalHead->right,view)) return;
+    // CCam gives world-space Front/Up directly. Do not reinterpret CCamera's
+    // internal matrix columns as a camera basis: it uses engine-specific axes.
+    if(!headcam::viewBasis(get<Vec>(cam,camFront),get<Vec>(cam,camUp),view)) return;
     if(!headcam::eyePosition(head,position(player),view,eye)) return;
     float oldClip=get<float>(rw,168);
     if (!std::isfinite(oldClip) || oldClip<=0.0f) return;
@@ -140,14 +138,12 @@ void processCamera(void* self) {
     saved.front=get<Vec>(cam,camFront); saved.up=get<Vec>(cam,camUp);
     saved.game=get<Vec>(camera,gamePosition);
     saved.valid=true;
-    // Preserve native touch yaw/pitch; add bounded animated roll and a local eye offset.
+    // Move only the origin, as in the previously working 0.1 camera.
+    // Preserve every orientation column exactly as produced by GTA.
     set(matrix,matrixPos,eye);
     set(camera,cameraMatrix+matrixPos,eye);
     set(camera,gamePosition,eye);
     set(cam,camSource,eye);
-    writeBasis(matrix,view);
-    if(matrix!=camera+cameraMatrix) writeBasis(camera+cameraMatrix,view);
-    set(cam,camFront,view.forward); set(cam,camUp,view.up);
     nearClip(rw,0.053333335f);
     copyToRw(camera,true);
     derivedValues(camera,false,false);
@@ -230,5 +226,5 @@ extern "C" JNIEXPORT void OnAllModsLoaded() {
     if (!aml->Hook(reinterpret_cast<void*>(symbols[1]),reinterpret_cast<void*>(processCamera),reinterpret_cast<void**>(&originalProcess))) {
         log("Camera hook failed; disabled"); return;
     }
-    log("HeadCam 0.2.0 enabled: visible body, head alignment, animated roll; weapons unchanged");
+    log("HeadCam 0.2.1 enabled: native camera axes, visible body, head alignment, ordinary aim");
 }

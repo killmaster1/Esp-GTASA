@@ -1,6 +1,5 @@
 #pragma once
 #include <cmath>
-#include <algorithm>
 namespace headcam {
 struct Vec { float x, y, z; };
 struct Basis { Vec right, forward, up; };
@@ -23,18 +22,12 @@ inline bool orthogonal(const Basis& b) {
         && std::fabs(dot(b.right,b.up))<0.05f && std::fabs(dot(b.forward,b.up))<0.05f
         && dot(cross(b.right,b.forward),b.up)>0.9f;
 }
-// Native touch look sets yaw/pitch. Add only a bounded amount of animation roll.
-inline bool viewBasis(Vec front,Vec nativeUp,Vec animatedHeadUp,Basis& out) {
-    Vec f{},r{},u{};
+// Used only for local eye placement and skeletal alignment. The engine's actual
+// camera orientation matrices remain untouched, including their axis convention.
+inline bool viewBasis(Vec front,Vec nativeUp,Basis& out) {
+    Vec f{},r{};
     if(!normalize(front,f) || !normalize(cross(f,nativeUp),r)) return false;
-    u=cross(r,f);
-    Vec hint{};
-    if(!normalize(sub(animatedHeadUp,mul(f,dot(animatedHeadUp,f))),hint)) return false;
-    float roll=std::atan2(dot(hint,r),dot(hint,u));
-    // Avoid a sudden upside-down view during leaning/falling/getting into cars.
-    roll=std::max(-0.5235988f,std::min(0.5235988f,roll))*0.5f;
-    Vec up=add(mul(u,std::cos(roll)),mul(r,std::sin(roll)));
-    out={cross(f,up),f,up};
+    out={r,f,cross(r,f)};
     return orthogonal(out);
 }
 inline Vec rotate(Vec v,const Basis& oldBasis,const Basis& newBasis) {

@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <vector>
 #include <algorithm>
@@ -10,10 +11,11 @@ namespace clientui {
 struct Vec2 {float x,y;};
 struct Row {unsigned id;float hp,armour,distance;};
 std::atomic<bool> boxEnabled{true},lineEnabled{true},healthEnabled{true};
-std::atomic<uint64_t> frames{0};
+std::atomic<uint64_t> frames{0},panelFrames{0},openRequests{0};
 std::mutex rowsMutex;
 std::vector<Row> rows;
-bool menuOpen=false,listOpen=false,installed=false;
+std::atomic<bool> menuOpen{false};
+bool listOpen=false,installed=false,handledAction=false;
 unsigned selected=0xffff;
 void (*originalEndFrame)()=nullptr;
 void* (*context)()=nullptr;
@@ -24,6 +26,7 @@ void (*end)()=nullptr;
 bool (*button)(const char*,const Vec2&)=nullptr;
 void (*setPos)(const Vec2&,int,const Vec2&)=nullptr;
 void (*setSize)(const Vec2&,int)=nullptr;
+void (*focusNext)()=nullptr;
 void (*text)(const char*,const char*)=nullptr;
 void (*color)(int,unsigned)=nullptr;
 void (*popColor)(int)=nullptr;
@@ -37,9 +40,14 @@ void publish(std::vector<Row> value){
     std::sort(value.begin(),value.end(),[](const Row& a,const Row& b){return a.distance<b.distance;});
     std::lock_guard<std::mutex> lock(rowsMutex);rows=std::move(value);
 }
+bool activated(const char* caption,const Vec2& size){
+    bool pressed=button(caption,size);
+    if(!pressed||handledAction)return false;
+    handledAction=true;return true;
+}
 void toggle(std::atomic<bool>& option,const char* label,const Vec2& size){
     char caption[96];std::snprintf(caption,sizeof(caption),"%s: %s",label,option.load()?"LIGADO":"DESLIGADO");
-    if(button(caption,size)){option=!option.load();std::snprintf(caption,sizeof(caption),"%s changed to %s",label,option.load()?"ON":"OFF");if(event)event(caption);}
+    if(activated(caption,size)){option=!option.load();std::snprintf(caption,sizeof(caption),"%s changed to %s",label,option.load()?"ON":"OFF");if(event)event(caption);}
 }
 void render(){
     void* ctx=context();if(!ctx)return;
@@ -58,39 +66,59 @@ void render(){
     const unsigned values[]{rgba(226,210,167),rgba(12,12,10,245),rgba(180,157,105),rgba(36,37,30),rgba(72,74,51),rgba(100,95,56)};
     for(int i=0;i<6;++i)color(ids[i],values[i]);
     style(3,0);style(4,2*scale);style(12,0);style(13,1.5f*scale);
-    // No title, resize, move, scroll, saved settings or keyboard/gamepad focus.
-    constexpr int flags=1|2|4|8|16|32|64|256|(1<<16)|(1<<17);
-    setPos({display.x*.5f-58*scale,display.y*.10f},1,{0,0});
-    if(begin("##AlynEspLauncher",nullptr,flags)){
-        fontScale(scale);
-        if(button("ESP",{100*scale,48*scale})){menuOpen=!menuOpen;if(event)event(menuOpen?"Menu opened":"Menu closed");}
-    }end();
-    if(menuOpen){
-        float panelWidth=std::min(display.x-24*scale,380*scale);
-        float panelHeight=std::min(display.y*.78f,listOpen?600*scale:390*scale);
+    // One root window alternates between launcher and panel. A release that opens
+    // the panel cannot activate an ESP option in that same submitted frame.
+    const bool expanded=menuOpen.load();handledAction=false;
+    float panelWidth=std::min(display.x-24*scale,380*scale);
+    float panelHeight=std::min(display.y*.78f,listOpen?600*scale:390*scale);
+    constexpr int baseFlags=1|2|4|32|256|(1<<16)|(1<<17);
+    if(expanded){
         setPos({display.x*.5f,display.y*.56f},1,{.5f,.5f});
         setSize({panelWidth,panelHeight},1);
-        // Fixed size panel: allow vertical scrolling for the nearby-player list.
-        int panelFlags=(flags&~(8|16|64));
-        if(begin("##AlynEspMenu",nullptr,panelFlags)){
-            fontScale(scale);text("ALYN ESP - SAN ANDREAS",nullptr);
+    }else{
+        setPos({display.x*.5f,display.y*.10f},1,{.5f,0});
+        setSize({164*scale,72*scale},1);
+    }
+    static bool previousExpanded=false;
+    const bool transition=expanded!=previousExpanded;
+    if(transition&&expanded)focusNext();
+    bool visible=begin("##AlynEspControlPanel021",nullptr,baseFlags|(expanded?0:8|16));
+    static int reportedVisible=-1;
+    if(transition||reportedVisible!=int(visible)){
+        if(event){char message[180];std::snprintf(message,sizeof(message),
+            "UI_WINDOW mode=%s visible=%d display=%.0fx%.0f size=%.0fx%.0f frame=%d",
+            expanded?"PANEL":"LAUNCHER",int(visible),display.x,display.y,
+            expanded?panelWidth:164*scale,expanded?panelHeight:72*scale,frame);event(message);}
+        reportedVisible=int(visible);
+    }
+    previousExpanded=expanded;
+    if(visible){
+        fontScale(scale);
+        if(!expanded){
+            if(activated("MENU ESP",{140*scale,48*scale})){
+                menuOpen=true;listOpen=false;++openRequests;
+                if(event)event("UI_OPEN_REQUEST: MENU ESP pressed; panel scheduled for next frame; ESP options unchanged");
+            }
+        }else{
+            ++panelFrames;text("ALYN ESP 0.2.1",nullptr);
             Vec2 size{panelWidth-32*scale,48*scale};
             toggle(boxEnabled,"ESP BOX",size);
             toggle(healthEnabled,"BARRA DE VIDA",size);
             toggle(lineEnabled,"ESP LINE",size);
-            if(button(listOpen?"OCULTAR JOGADORES":"JOGADORES PROXIMOS",size))listOpen=!listOpen;
+            if(activated(listOpen?"OCULTAR JOGADORES":"JOGADORES PROXIMOS",size))listOpen=!listOpen;
             if(listOpen){
                 std::vector<Row> snapshot;{std::lock_guard<std::mutex> lock(rowsMutex);snapshot=rows;}
                 if(snapshot.empty())text("Aguardando jogadores sincronizados...",nullptr);
                 for(const auto& row:snapshot){
                     char caption[128];std::snprintf(caption,sizeof(caption),"%sID %u | %.0f m | VIDA %.0f",selected==row.id?"> ":"",row.id,row.distance,row.hp);
-                    if(button(caption,size)){selected=row.id;if(event)event(caption);}
+                    if(activated(caption,size)){selected=row.id;if(event)event(caption);}
                     if(selected==row.id){char details[96];std::snprintf(details,sizeof(details),"Vida %.0f / Colete %.0f",row.hp,row.armour);text(details,nullptr);}
                 }
             }
-            if(button("FECHAR",size))menuOpen=false;
-        }end();
+            if(activated("FECHAR MENU",size)){menuOpen=false;if(event)event("UI_CLOSE_REQUEST: menu closed; ESP options unchanged");}
+        }
     }
+    end();
     popStyle(4);popColor(6);
 }
 void endFrame(){render();originalEndFrame();}

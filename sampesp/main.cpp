@@ -8,7 +8,7 @@
 #include "diagnostics.h"
 #include "client_features.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.2.0, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.2.1, Custom)
 // AML calls below exist since 1.0.1 or earlier; allow the reported AML 1.3.1.
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.3.1)
@@ -75,7 +75,7 @@ void initializeLog(){
         }
     }
     auto path=fileLog.filename();
-    fileLog.write("===== Alyn ESP 0.2.0 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+    fileLog.write("===== Alyn ESP 0.2.1 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
 }
 struct FrameStats {
     const char* reason="scanned";
@@ -96,7 +96,7 @@ struct FrameReport {
         uint64_t now=diagnostics::millis();if(lastReport&&now-lastReport<5000)return;lastReport=now;
         fileLog.write("FRAME reason=%s screen=%.0fx%.0f slots=%d free=%d null=%d self=%d not_player=%d players=%d no_rw=%d dead=%d other_area=%d too_far=%d bad_position=%d drawn=%d polygon_calls=%d",
             stats.reason,width,height,stats.slots,stats.free,stats.nullPed,stats.self,stats.notPlayer,stats.players,stats.noRw,stats.dead,stats.area,stats.range,stats.badPos,stats.drawn,stats.quads);
-        fileLog.write("FEATURES box=%d line=%d health=%d synced_health=%d unknown_health=%d gui_frames=%llu",int(clientui::boxEnabled.load()),int(clientui::lineEnabled.load()),int(clientui::healthEnabled.load()),stats.syncedHealth,stats.unknownHealth,(unsigned long long)clientui::frames.load());
+        fileLog.write("FEATURES box=%d line=%d health=%d synced_health=%d unknown_health=%d gui_frames=%llu menu_open=%d open_requests=%llu panel_frames=%llu",int(clientui::boxEnabled.load()),int(clientui::lineEnabled.load()),int(clientui::healthEnabled.load()),stats.syncedHealth,stats.unknownHealth,(unsigned long long)clientui::frames.load(),int(clientui::menuOpen.load()),(unsigned long long)clientui::openRequests.load(),(unsigned long long)clientui::panelFrames.load());
         fileLog.write("FILTER no_hierarchy=%d bad_hierarchy=%d missing_bone=%d sample_tag=%d sample_index=%d sample_node_count=%d invalid_bone_position=%d stale_bone=%d projection_failed=%d sample_depth=%.3f invalid_box=%d offscreen=%d ped_types_0_to_6=%d,%d,%d,%d,%d,%d,%d other_types=%d",
             stats.noHierarchy,stats.badHierarchy,stats.missingBone,stats.missingTag,stats.missingIndex,stats.nodeCount,stats.badBonePos,stats.staleBone,stats.projection,stats.failedDepth,stats.badBox,stats.offscreen,
             stats.types[0],stats.types[1],stats.types[2],stats.types[3],stats.types[4],stats.types[5],stats.types[6],stats.types[7]);
@@ -273,7 +273,7 @@ extern "C" JNIEXPORT void OnAllModsLoaded(){
     hierarchyFromClump=reinterpret_cast<decltype(hierarchyFromClump)>(symbols[9]);boneIndex=reinterpret_cast<decltype(boneIndex)>(symbols[10]);
     if(!aml->Hook(reinterpret_cast<void*>(symbols[0]),reinterpret_cast<void*>(draw),reinterpret_cast<void**>(&original2D))){phase="render_hook_failed";log("2D render hook failed; disabled");return;}
     phase="hook_installed";
-    log("Alyn ESP 0.2.0 ready; hook installed; waiting for first render callback and matching client");
+    log("Alyn ESP 0.2.1 ready; hook installed; waiting for first render callback and matching client");
 }
 
 extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

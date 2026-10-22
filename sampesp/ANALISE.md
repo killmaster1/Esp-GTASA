@@ -17,7 +17,7 @@ O mod lê esses dois floats após o processamento original, sem modificá-los, e
 
 ## Interface e toque
 
-A biblioteca exporta **Dear ImGui 1.92.8**. `GetVersion`, em `0x5c5e50`, retorna essa versão. Foram conferidos os 16 símbolos usados pelo menu, incluindo `Begin`, `End`, `Button`, estilos e `EndFrame`.
+A biblioteca exporta **Dear ImGui 1.92.8**. `GetVersion`, em `0x5c5e50`, retorna essa versão. Foram conferidos os 17 símbolos usados pelo menu, incluindo `Begin`, `End`, `Button`, estilos e `EndFrame`.
 
 O menu é submetido antes do `EndFrame` original, em `0x5d1140`, apenas dentro de um quadro ativo e uma vez por quadro/contexto. As pilhas de cores, estilos e janelas são restauradas antes de devolver o controle ao cliente. O tema usa fundo escuro, bordas retas e letras em bege, inspirado nos menus de San Andreas; não inclui fontes ou texturas extraídas do jogo.
 

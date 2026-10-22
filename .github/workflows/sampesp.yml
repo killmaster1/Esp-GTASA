@@ -28,6 +28,17 @@ jobs:
           /tmp/sampesp-log-test
           g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/features_test.cpp -ldl -pthread -o /tmp/sampesp-features-test
           /tmp/sampesp-features-test
+      - name: Checkout ImGui 1.92.8 for real input test
+        uses: actions/checkout@v4
+        with:
+          repository: ocornut/imgui
+          ref: 8936b58fe26e8c3da834b8f60b06511d537b4c63
+          path: .test-imgui
+          persist-credentials: false
+      - name: Test menu opening with real ImGui input events
+        run: |
+          g++ -std=c++17 -I.test-imgui sampesp/tests/menu_input_test.cpp .test-imgui/imgui.cpp .test-imgui/imgui_draw.cpp .test-imgui/imgui_widgets.cpp .test-imgui/imgui_tables.cpp -pthread -o /tmp/sampesp-menu-input-test
+          /tmp/sampesp-menu-input-test
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'

@@ -51,8 +51,8 @@ void setup(){
 int main(){
     hierarchyFromClump=hierarchyMock;boneIndex=indexMock;original2D=originalMock;localPed=selfMock;getPed=pedMock;isPlayer=playerMock;bonePosition=boneMock;project=projectMock;polygon=polygonMock;
     poolPtr=&poolValue;screen=fakeScreen;put(screen,8,1280);put(screen,12,720);
-    setup();sampReady=true;draw();assert(renderCalls==1&&quads==10);
-    assert(colors.size()==10&&colors.front().r==0&&colors.back().g==255);
+    setup();sampReady=true;draw();assert(renderCalls==1&&quads==12);
+    assert(colors.size()==12&&colors.front().r==0&&colors[9].g==255);
     FrameStats rejected;currentStats=&rejected;Box rejectedBox{};
     missingBone=true;assert(!playerBox(peds[1],position(peds[1]),rejectedBox));
     assert(rejected.missingBone==1&&rejected.missingTag==5&&rejected.missingIndex==-1);currentStats=nullptr;
@@ -63,12 +63,12 @@ int main(){
     put(peds[1],1824,uint32_t(4));quads=0;draw();assert(quads==0);
     put(peds[1],1824,uint32_t(1));put(peds[1],1708,std::numeric_limits<float>::quiet_NaN());draw();assert(quads==0);
     // Remote in a vehicle/animation is still eligible; skeleton determines the box.
-    setup();put(peds[1],1800,static_cast<void*>(peds[2]));draw();assert(quads==10);
+    setup();put(peds[1],1800,static_cast<void*>(peds[2]));draw();assert(quads==12);
     // Clip partially visible boxes and lines without sending huge coordinates to RenderWare.
     Point a{-10000,100},b{10000,100};assert(esp::clip(a,b,1280,720));assert(std::fabs(a.x)<.01f&&std::fabs(b.x-1280)<.01f);
     a={-20,-10};b={-10,300};assert(!esp::clip(a,b,1280,720));
     a={std::numeric_limits<float>::quiet_NaN(),0};b={1,2};assert(!esp::clip(a,b,1280,720));
-    quads=0;put(peds[1],8,Vec{-12.7f,10,0});draw();assert(quads>0&&quads<=10);
+    quads=0;put(peds[1],8,Vec{-12.7f,10,0});draw();assert(quads>0&&quads<=12);
     // Exact client build ID is checked through the loaded ELF note, without dlopen.
     alignas(8) uint8_t notes[36]{};put(notes,0,ElfW(Nhdr){4,20,NT_GNU_BUILD_ID});std::memcpy(notes+12,"GNU\0",4);
     const uint8_t build[]{0xa8,0x61,0x94,0x42,0x04,0xc6,0x30,0x9b,0xb4,0x33,0xb7,0xe2,0xbe,0x8a,0x2f,0x13,0xc1,0x37,0xae,0x66};std::memcpy(notes+16,build,20);
@@ -77,5 +77,13 @@ int main(){
     bool match=false;assert(findSamp(&info,sizeof(info),&match)==1&&match);
     notes[16]^=1;match=false;assert(findSamp(&info,sizeof(info),&match)==0&&!match);
     notes[16]^=1;put(notes,4,uint32_t(0xffffffff));assert(findSamp(&info,sizeof(info),&match)==0&&!match);
+    // Health stays separate from synthetic CPed HP and toggles control real draw calls.
+    setup();int remoteMarker=0;
+    features::healthCache.update({&remoteMarker,peds[1],42,25,10,diagnostics::millis()});
+    quads=0;colors.clear();draw();assert(quads==13&&colors.back().r==240&&colors.back().g==45);
+    clientui::boxEnabled=false;clientui::lineEnabled=false;quads=0;draw();assert(quads==0);
+    clientui::lineEnabled=true;draw();assert(quads==2);
+    clientui::boxEnabled=true;clientui::lineEnabled=false;quads=0;draw();assert(quads==11);
+    assert(!clientui::rows.empty()&&clientui::rows[0].id==42&&clientui::rows[0].hp==25);
     std::cout<<"ESP tests passed: player filter, skeleton boxes, lines, clipping and client build check\n";
 }

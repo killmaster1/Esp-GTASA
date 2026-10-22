@@ -6,8 +6,9 @@
 #include <cstring>
 #include "overlay_math.h"
 #include "diagnostics.h"
+#include "client_features.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.1.2, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.2.0, Custom)
 // AML calls below exist since 1.0.1 or earlier; allow the reported AML 1.3.1.
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.3.1)
@@ -32,6 +33,7 @@ void (*polygon)(float,float,float,float,float,float,float,float,const Color&)=nu
 Pool** poolPtr=nullptr;
 uint8_t* screen=nullptr;
 bool sampReady=false;
+uintptr_t sampBase=0;
 unsigned retryFrames=0;
 float width=0,height=0;
 template<class T>T read(const void* p,size_t off){T v;std::memcpy(&v,static_cast<const uint8_t*>(p)+off,sizeof(v));return v;}
@@ -73,25 +75,28 @@ void initializeLog(){
         }
     }
     auto path=fileLog.filename();
-    fileLog.write("===== Alyn ESP 0.1.2 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+    fileLog.write("===== Alyn ESP 0.2.0 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
 }
 struct FrameStats {
     const char* reason="scanned";
     int slots=0,free=0,nullPed=0,self=0,notPlayer=0,players=0,noRw=0,dead=0,area=0,range=0,badPos=0;
     int noHierarchy=0,badHierarchy=0,missingBone=0,badBonePos=0,staleBone=0,projection=0,badBox=0,offscreen=0,drawn=0,quads=0;
     int missingTag=-1,missingIndex=-1,nodeCount=0,types[8]{};
-    float failedDepth=0;
+    float failedDepth=0;int syncedHealth=0,unknownHealth=0;
 };
 FrameStats* currentStats=nullptr;
 uint64_t lastReport=0;
 struct FrameReport {
     FrameStats stats;
+    std::vector<clientui::Row> candidates;
     FrameReport(){currentStats=&stats;}
     ~FrameReport(){
         currentStats=nullptr;
+        clientui::publish(std::move(candidates));
         uint64_t now=diagnostics::millis();if(lastReport&&now-lastReport<5000)return;lastReport=now;
         fileLog.write("FRAME reason=%s screen=%.0fx%.0f slots=%d free=%d null=%d self=%d not_player=%d players=%d no_rw=%d dead=%d other_area=%d too_far=%d bad_position=%d drawn=%d polygon_calls=%d",
             stats.reason,width,height,stats.slots,stats.free,stats.nullPed,stats.self,stats.notPlayer,stats.players,stats.noRw,stats.dead,stats.area,stats.range,stats.badPos,stats.drawn,stats.quads);
+        fileLog.write("FEATURES box=%d line=%d health=%d synced_health=%d unknown_health=%d gui_frames=%llu",int(clientui::boxEnabled.load()),int(clientui::lineEnabled.load()),int(clientui::healthEnabled.load()),stats.syncedHealth,stats.unknownHealth,(unsigned long long)clientui::frames.load());
         fileLog.write("FILTER no_hierarchy=%d bad_hierarchy=%d missing_bone=%d sample_tag=%d sample_index=%d sample_node_count=%d invalid_bone_position=%d stale_bone=%d projection_failed=%d sample_depth=%.3f invalid_box=%d offscreen=%d ped_types_0_to_6=%d,%d,%d,%d,%d,%d,%d other_types=%d",
             stats.noHierarchy,stats.badHierarchy,stats.missingBone,stats.missingTag,stats.missingIndex,stats.nodeCount,stats.badBonePos,stats.staleBone,stats.projection,stats.failedDepth,stats.badBox,stats.offscreen,
             stats.types[0],stats.types[1],stats.types[2],stats.types[3],stats.types[4],stats.types[5],stats.types[6],stats.types[7]);
@@ -125,7 +130,7 @@ int findSamp(dl_phdr_info* info,size_t,void* result){
                 fileLog.write("CLIENT build_id=%s expected=a861944204c6309bb433b7e2be8a2f13c137ae66",actual);
             }
             if(note.n_type==NT_GNU_BUILD_ID&&note.n_namesz==4&&note.n_descsz==sizeof(expected)&&!std::memcmp(data+off,"GNU\0",4)&&!std::memcmp(data+off+nameSize,expected,sizeof(expected))){
-                *static_cast<bool*>(result)=true;reported=true;return 1;
+                *static_cast<bool*>(result)=true;sampBase=info->dlpi_addr;reported=true;return 1;
             }
             off+=nameSize+descSize;
         }
@@ -148,6 +153,21 @@ void boxEdges(Box b,float thickness,Color color){
     segment({b.right,b.top},{b.right,b.bottom},thickness,color);
     segment({b.right,b.bottom},{b.left,b.bottom},thickness,color);
     segment({b.left,b.bottom},{b.left,b.top},thickness,color);
+}
+void rectangle(float left,float top,float right,float bottom,Color color){
+    left=std::max(0.f,left);top=std::max(0.f,top);right=std::min(width-1,right);bottom=std::min(height-1,bottom);
+    if(right<=left||bottom<=top)return;
+    if(currentStats)++currentStats->quads;
+    polygon(left,top,right,top,left,bottom,right,bottom,color);
+}
+void drawHealth(Box box,bool known,float value,float scale){
+    float right=box.left-4*scale,left=right-4*scale;
+    rectangle(left-scale,box.top-scale,right+scale,box.bottom+scale,{0,0,0,220});
+    rectangle(left,box.top,right,box.bottom,{75,75,75,220});
+    if(known){
+        float fill=health::fraction(value);auto color=health::color(value);
+        rectangle(left,box.bottom-(box.bottom-box.top)*fill,right,box.bottom,{color.r,color.g,color.b,color.a});
+    }
 }
 bool playerBox(void* ped,Vec center,Box& box){
     // Head, pelvis, hands and feet. Native bone tag IDs, not skin matrix indices.
@@ -191,6 +211,7 @@ void draw(){
         }
     }
     phase="active";
+    if(!features::attempted&&sampBase)features::install(aml,sampBase,log);
     void* self=localPed(-1);Pool* pool=*poolPtr;
     if(!self){stats.reason="local_player_missing";return;}
     if(!pool||!pool->storage||!pool->flags||pool->size<1||pool->size>100000){stats.reason="ped_pool_missing_or_invalid";return;}
@@ -213,11 +234,18 @@ void draw(){
         Vec center=position(ped);if(!esp::finite(center)){++stats.badPos;continue;}
         float dx=center.x-origin.x,dy=center.y-origin.y,dz=center.z-origin.z;
         if(dx*dx+dy*dy+dz*dz>range*range){++stats.range;continue;}
+        health::Sample hp{};bool known=features::healthCache.get(ped,diagnostics::millis(),hp);
+        if(known){++stats.syncedHealth;report.candidates.push_back({hp.id,hp.hp,hp.armour,std::sqrt(dx*dx+dy*dy+dz*dz)});}else ++stats.unknownHealth;
+        bool boxes=clientui::boxEnabled.load(),lines=clientui::lineEnabled.load();
+        if(!boxes&&!lines){stats.reason="overlay_disabled";continue;}
         Box box{};if(!playerBox(ped,center,box))continue;
         Point a{width*.5f,height-3.f},b{(box.left+box.right)*.5f,box.bottom};
         float scale=std::max(.8f,std::min(2.5f,height/720.f));
-        segment(a,b,3.5f*scale,outline);boxEdges(box,3.8f*scale,outline);
-        segment(a,b,1.5f*scale,green);boxEdges(box,1.8f*scale,green);++drawn;++stats.drawn;
+        if(lines)segment(a,b,3.5f*scale,outline);
+        if(boxes)boxEdges(box,3.8f*scale,outline);
+        if(lines)segment(a,b,1.5f*scale,green);
+        if(boxes){boxEdges(box,1.8f*scale,green);if(clientui::healthEnabled.load())drawHealth(box,known,hp.hp,scale);}
+        ++drawn;++stats.drawn;
     }
 }
 }
@@ -245,7 +273,7 @@ extern "C" JNIEXPORT void OnAllModsLoaded(){
     hierarchyFromClump=reinterpret_cast<decltype(hierarchyFromClump)>(symbols[9]);boneIndex=reinterpret_cast<decltype(boneIndex)>(symbols[10]);
     if(!aml->Hook(reinterpret_cast<void*>(symbols[0]),reinterpret_cast<void*>(draw),reinterpret_cast<void**>(&original2D))){phase="render_hook_failed";log("2D render hook failed; disabled");return;}
     phase="hook_installed";
-    log("Alyn ESP 0.1.2 ready; hook installed; waiting for first render callback and matching client");
+    log("Alyn ESP 0.2.0 ready; hook installed; waiting for first render callback and matching client");
 }
 
 extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

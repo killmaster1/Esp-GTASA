@@ -1,6 +1,16 @@
-# Alyn Player ESP 0.1.2 — ARM64 / AML
+# Alyn Player ESP 0.2.0 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
+
+## Novidades da 0.2.0
+
+- Barra vertical de vida à esquerda do ESP Box, preenchida de baixo para cima usando a vida sincronizada do cliente Alyn. A vida interna de 1000 usada pelo GTA para os remotos não é usada nessa barra.
+- Cores: **verde acima de 75**, **amarelo acima de 50 até 75**, **laranja acima de 25 até 50**, **vermelho de 0 a 25**. Cinza indica falta de um valor sincronizado recente. A referência de preenchimento é 100; números maiores continuam disponíveis na lista.
+- Botão **ESP** no alto, ao centro, com tema inspirado em San Andreas. Abre controles separados para **ESP Box**, **Barra de vida** e **ESP Line**. Desligar a caixa também oculta a barra; a linha tem controle independente. As opções valem durante a sessão e voltam ligadas ao reiniciar.
+- Lista **Jogadores próximos**, ordenada por distância, com ID e vida. Toque em uma linha para mostrar também o colete. A seleção é somente para consulta, sem ação de dano.
+- Mantém o arquivo de diagnóstico e a dependência mínima AML 1.3.1.
+
+Detalhes da análise, offsets específicos e limites das conclusões sobre dano: [ANALISE.md](ANALISE.md).
 
 ## Instalação
 
@@ -19,7 +29,7 @@ Requer AML 1.3.1 ou superior carregado pelo APK do SA-MP, além das bibliotecas 
 - Não testa oclusão por paredes. Alvos parcialmente fora da tela têm as linhas recortadas antes do desenho.
 - Só funciona com personagens que já estejam carregados no cliente. Não revela jogadores fora do streaming, não consulta posições no servidor e não altera pacotes de rede.
 - A seleção usa `CPed::IsPlayer` do GTA (tipos 0 e 1), e não uma lista de IDs extraída de `CPlayerPool` do SA-MP. Bots ou personagens de outros mods classificados como jogadores pelo GTA também podem aparecer; isso precisa ser conferido no servidor usado.
-- Não há menu, botão, nome, ID ou alteração de mira nesta versão.
+- O menu usa a interface ImGui já presente no cliente. Não mostra nomes e não altera a mira. O toque e eventuais conflitos com controles ou janelas existentes precisam de teste no aparelho.
 
 ## Compatibilidade analisada
 
@@ -78,7 +88,7 @@ Como ler os primeiros sinais:
 
 Se **nenhum arquivo aparecer**, confira também as pastas alternativas. Pode ser que o AML não tenha carregado esta `.so`, que a dependência não tenha sido atendida ou que nenhum caminho tenha permitido gravação. Uma biblioteca que não foi carregada não consegue gerar seu próprio arquivo: nesse caso, é necessário o log do AML ou o logcat.
 
-Os testes simulados cobrem filtro de personagens, ossos ausentes, caixa e linha, clipping, identificação ELF e motivos de rejeição. Os testes de arquivo verificam fallback após falha de abertura, flush antes de fechar, gravações concorrentes e rotação. Esses testes não substituem a execução no celular. Nenhuma verificação de versão nem filtro de desenho foi removido nesta atualização.
+Os testes simulados cobrem filtro de personagens, ossos ausentes, caixa e linha, clipping, identificação ELF e motivos de rejeição. Também verificam as quatro faixas de vida, expiração e associação do cache, diferença entre vida sincronizada e vida GTA 1000, controles reais do desenho, seleção na lista e equilíbrio das pilhas do menu. Os testes de arquivo verificam fallback após falha de abertura, flush antes de fechar, gravações concorrentes e rotação. Esses testes não substituem a execução no celular. Nenhuma verificação de versão nem filtro de desenho foi removido nesta atualização.
 
 ## Compilar
 

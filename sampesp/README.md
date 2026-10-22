@@ -1,6 +1,16 @@
-# Alyn Player ESP 0.3.7 — ARM64 / AML
+# Alyn Player ESP 0.3.8 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
+
+## Investigação de posições distantes (0.3.8)
+
+Esta versão adiciona somente um observador dos dados de posição compactada que o cliente já recebe. Não adiciona marcador, menu, comando ou teleporte. Preserva as funções da 0.3.7. O objetivo é verificar se o servidor envia posições recentes de jogadores sem personagem carregado no cliente.
+
+As linhas `DISTANT_SAMPLE` em `alyn_esp.log` identificam jogador, coordenadas inteiras, presença do wrapper GTA e origem do dado. `remote_has_wrapper=0` significa que, no momento do pacote, o objeto remoto não tinha wrapper de personagem. Isso não informa por si só a distância, o interior ou o mundo virtual. O relatório `DISTANT_PROBE` resume os contadores. Logs de amostras são limitados por ID e globalmente; o cache de diagnóstico recebe todas as amostras válidas e considera recentes apenas as dos últimos cinco segundos.
+
+Para testar: deixe um jogador em LS e o cliente de teste em LV, mova o jogador de LS durante cerca de 30 segundos e consulte/envie o `alyn_esp.log`, informando seu ID. Uma posição recente sem wrapper comprova esse caminho para o jogador no servidor testado; ausência de amostra ainda pode significar configuração do servidor, jogador sem entrada ativa ou caminho diferente do cliente. Isso não torna uma posição antiga válida para teleporte.
+
+Análise e alternativas: [POSICOES_DISTANTES.md](POSICOES_DISTANTES.md).
 
 ## Dano da sniper em personagens em 3× (0.3.7)
 

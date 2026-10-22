@@ -13,7 +13,7 @@
 #include "sniper_cadence.h"
 #include "sniper_damage.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.7, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.8, Custom)
 // AML calls below exist since 1.0.1 or earlier; allow the reported AML 1.3.1.
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.3.1)
@@ -80,7 +80,7 @@ void initializeLog(){
         }
     }
     auto path=fileLog.filename();
-    fileLog.write("===== Alyn ESP 0.3.7 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+    fileLog.write("===== Alyn ESP 0.3.8 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
 }
 struct FrameStats {
     const char* reason="scanned";
@@ -100,6 +100,7 @@ struct FrameReport {
         fileLog.write("FRAME reason=%s screen=%.0fx%.0f slots=%d free=%d null=%d self=%d not_player=%d players=%d no_rw=%d dead=%d other_area=%d too_far=%d bad_position=%d drawn=%d polygon_calls=%d",
             stats.reason,width,height,stats.slots,stats.free,stats.nullPed,stats.self,stats.notPlayer,stats.players,stats.noRw,stats.dead,stats.area,stats.range,stats.badPos,stats.drawn,stats.quads);
         fileLog.write("FEATURES box=%d line=%d health=%d synced_health=%d unknown_health=%d ui=removed",int(options::boxEnabled.load()),int(options::lineEnabled.load()),int(options::healthEnabled.load()),stats.syncedHealth,stats.unknownHealth);
+        fileLog.write("DISTANT_PROBE hooks=%u samples=%llu without_wrapper_updates=%llu fresh_without_wrapper=%u inactive=%llu",distantprobe::installed,(unsigned long long)distantprobe::received.load(),(unsigned long long)distantprobe::withoutWrapper.load(),distantprobe::cache.freshWithoutWrapper(now),(unsigned long long)distantprobe::inactive.load());
         fileLog.write("DAMAGE installed=%d multiplier=3 impacts_adjusted=%llu base=%d boosted=%d",int(damageboost::installed),(unsigned long long)damageboost::boosted.load(),damageboost::lastBase.load(),damageboost::lastValue.load());
         fileLog.write("CADENCE hooks=%u shots_adjusted=%llu original_ms=%u reduced_ms=%u",cadence::installed,(unsigned long long)cadence::adjusted.load(),cadence::lastOriginalMs.load(),cadence::lastReducedMs.load());
         fileLog.write("PENETRATION installed=%d enabled=%d bullet_rays=%llu filtered_local_sniper=%llu filtered_hits=%llu",int(penetration::installed),int(options::penetrationEnabled.load()),(unsigned long long)penetration::rays.load(),(unsigned long long)penetration::filtered.load(),(unsigned long long)penetration::hits.load());
@@ -291,7 +292,7 @@ extern "C" JNIEXPORT void OnAllModsLoaded(){
     cadence::install(aml,handle,base,log);
     damageboost::install(aml,handle,base,log);
     phase="hook_installed";
-    log("Alyn ESP 0.3.7 ready; hook installed; waiting for first render callback and matching client");
+    log("Alyn ESP 0.3.8 ready; hook installed; waiting for first render callback and matching client");
 }
 
 extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

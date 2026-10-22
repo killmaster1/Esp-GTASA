@@ -38,6 +38,8 @@ jobs:
           /tmp/sampesp-cadence-test
           g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/damage_test.cpp -ldl -pthread -o /tmp/sampesp-damage-test
           /tmp/sampesp-damage-test
+          g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/distant_probe_test.cpp -ldl -pthread -o /tmp/sampesp-distant-probe-test
+          /tmp/sampesp-distant-probe-test
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'

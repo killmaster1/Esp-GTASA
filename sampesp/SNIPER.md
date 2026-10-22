@@ -1,12 +1,12 @@
 # Trava da sniper e zoom estendido — 0.3.0
 
-No menu **MENU ESP**, as opções **TRAVA SNIPER** e **ZOOM ESTENDIDO** iniciam ligadas e têm controles independentes.
+Na versão 0.3.4, a trava da sniper e o zoom estendido iniciam ligados automaticamente. O menu e os seus controles foram removidos.
 
 ## Usar
 
 Equipe a sniper (arma GTA 34) e abra a luneta. A trava escolhe o jogador carregado cuja parte superior do tronco está mais próxima do ponto central da mira. Mantém esse alvo enquanto ele permanecer válido e com linha de visão; solte a mira para escolher outro. O disparo continua no controle do jogador.
 
-A aquisição considera o centro da tela, não a distância no mapa. Personagens mortos, NPCs comuns, outras áreas e alvos encobertos por construções, veículos ou objetos são descartados. A trava atua nas câmeras da luneta 7 e 46, com a sniper equipada e a câmera pertencendo ao jogador local. Fica suspensa durante o menu, espelhos e câmeras de cena.
+A aquisição considera o centro da tela, não a distância no mapa. Personagens mortos, NPCs comuns, outras áreas e alvos encobertos por construções, veículos ou objetos são descartados. A trava atua nas câmeras da luneta 7 e 46, com a sniper equipada e a câmera pertencendo ao jogador local. Fica suspensa durante espelhos e câmeras de cena.
 
 Use os controles normais de aproximar/afastar da sniper para o zoom. A nova faixa é **FOV de 70° a 1°**; quanto menor o FOV, maior a aproximação. O limite de 1° é o piso adotado por este mod para manter uma projeção positiva e finita, não uma garantia de máximo absoluto de ampliação que o hardware ou o motor conseguiriam representar.
 
@@ -30,6 +30,6 @@ Os 17 símbolos adicionais são conferidos com seus endereços relativos antes d
 
 `alyn_esp.log` inclui `SNIPER installed`, arma, modo, estado de luneta, ID do alvo quando associado à sincronização e FOV. `target_id=-1` pode significar ausência de alvo ou alvo sem associação recente no cache.
 
-Os testes cobrem escolha pelo centro da mira, obstrução, far plane, jogador morto na sincronização, osso ausente, arma incorreta, abertura do menu, espelho, saída da luneta, limites de zoom, pedidos de FOV alheios e retorno ao processamento nativo. Os controles novos também entram no teste de toque com ImGui real no host.
+Os testes cobrem escolha pelo centro da mira, obstrução, far plane, jogador morto na sincronização, osso ausente, arma incorreta, espelho, saída da luneta, limites de zoom, pedidos de FOV alheios e retorno ao processamento nativo.
 
 Esses testes e a compilação Android não substituem o teste do alinhamento da luneta e do zoom no aparelho.

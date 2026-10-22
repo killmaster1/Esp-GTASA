@@ -1,66 +1,24 @@
-# Alyn Player ESP 0.3.3 — ARM64 / AML
+# Alyn Player ESP 0.3.4 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
 
-## Correção do crash na cor do texto (0.3.3)
+## Versão 0.3.4 sem menu
 
-Os logs enviados confirmam a 0.3.2 carregada e mostram um crash diferente: `SIGSEGV` em `CFont::SetColor + 4` (`libGTASA + 0x6cee10`), chamado por `simpleui::frame`. O registrador `x0` contém `0xffcde6f0`, exatamente os bytes RGBA da cor do texto `{240,230,205,255}`. A instrução nesse ponto é `ldrb w9,[x0]`: a função espera o endereço da cor, mas a declaração anterior passava os quatro bytes como um inteiro. O mesmo padrão de acesso existe em `SetDropColor`.
+Removidos os menus antigo e simples, o botão, os textos de interface, a lista de jogadores e os hooks de toque/teclado. Não há comando `/alynesp` nesta versão. Não chama `CFont` nem funções ImGui. O ESP Box, ESP Line, barra de vida, trava da sniper e zoom estendido continuam iniciando ligados, automaticamente, no cliente compatível. Para desativar o mod inteiro, remova a biblioteca com o jogo encerrado.
 
-A 0.3.3 corrige as duas chamadas para receberem um ponteiro a uma cor local válida. A forma de passagem foi conferida no código ARM64 das funções; o nome C++ exportado, que mostra CRGBA por valor, não basta para reproduzir essa ABI com uma estrutura trivial. O desenho e os comandos continuam disponíveis. A integração pelo `BL` de `Idle`, introduzida na 0.3.2, é mantida.
+O hook de renderização continua no `BL` de `Idle + 0x4d9108`, preservando a entrada de `Render2dStuff`. O log `alyn_esp.log` continua disponível, com versão, carregamento, saúde sincronizada, renderização e estado da sniper.
 
-O teste do menu agora executa também com `fontReady=true`, cobrindo as duas cores por ponteiro, a ordem da configuração de alpha, o texto do botão e do painel, o flush e a restauração dos 64 bytes de configurações da fonte. Anteriormente esse caminho não era exercitado. Compilar e passar nos testes do host não confirma o funcionamento no APK; a nova biblioteca ainda precisa de teste no aparelho.
+## Compilar localmente no Linux
 
-## Correção do crash SIGILL na 0.3.2
+Com Android NDK r27c instalado, não é necessário usar GitHub Actions, Gradle ou SDK completo:
 
-O crash relatado na 0.3.1 ocorreu em `libGTASA.so + 0x4d89a4` (`Render2dStuff + 0x10`), durante o retorno do trampoline chamado pelo mod, antes do desenho do painel. A pilha inclui o wrapper Alyn `+0x47de10`, o mod e a entrada do GTA. O endereço é compatível com sobreposição entre patches na entrada, embora o log não contenha os bytes da instrução para provar qual patch estava presente. Não é evidência de proteção contra desenhos, nem de falta de arquivos de textura.
-
-A 0.3.2 remove o nosso hook da entrada de `Render2dStuff`. Intercepta somente o `BL` em `Idle + 0x4d9108`, cujo destino original é `Render2dStuff` e cujo retorno é `+0x4d910c`. Usa `AML::HookBL`, disponível desde AML 1.0.4, preservando a entrada usada pelo cliente. A instrução esperada é `0x97fffe23`; se mudou ou o hook for rejeitado, desativa a integração e registra o motivo, sem voltar ao hook de entrada.
-
-O botão e os comandos da 0.3.1 são mantidos, agora identificados como **ALYN 0.3.2**. O diagnóstico inclui `RENDER install=Idle_BL`, bytes da entrada antes da instalação, resultado do hook e fase `calling_original_2d` / `original_2d_returned`. O teste isolado verifica a instrução e que a entrada permanece intacta, inclusive quando já contém um patch. Isso não substitui a validação no aparelho.
-
-**Force a parada completa do jogo antes de substituir `libsampesp.so` e inicie um processo novo**; trocar o arquivo com o processo aberto não desfaz os patches da versão anterior.
-
-## Sniper na 0.3.0
-
-- **TRAVA SNIPER**: ao abrir a luneta com a sniper equipada, escolhe o jogador válido mais próximo do centro da mira e acompanha a parte superior do tronco. Solte a mira para adquirir outro alvo. Considera obstáculos do cenário e a vida sincronizada.
-- **ZOOM ESTENDIDO**: os controles normais da luneta passam a percorrer FOV de 70° até 1°. O alcance continua limitado à renderização atual do mapa e aos jogadores carregados pelo cliente.
-- As duas opções iniciam ligadas e podem ser desligadas separadamente no menu. A atuação é suspensa enquanto o menu está aberto.
-
-Detalhes, limites e análise das funções nativas: [SNIPER.md](SNIPER.md).
-
-## Botão simples e comando local na 0.3.1
-
-Substitui a janela ImGui pelo botão azul **MENU TESTE**, no alto ao centro, e um painel desenhado com `CSprite2d` + `CFont` do GTA. A legenda identifica a versão carregada (**ALYN 0.3.3** na correção atual). O botão apenas abre ou fecha o painel; não liga o ESP. O painel conserva controles separados para caixa, linha, vida, trava da sniper, zoom e consulta de jogadores com paginação.
-
-No chat do SA-MP:
-
-```text
-/alynesp                 abre o menu (repetir mantém aberto)
-/alynesp fechar          fecha
-/alynesp teste           mostra confirmação visual
-/alynesp box on          liga a caixa
-/alynesp box off         desliga a caixa
-/alynesp linha off       desliga a linha
-/alynesp vida off        desliga a barra
-/alynesp aim off         desliga a trava
-/alynesp zoom off        desliga o zoom estendido
+```sh
+bash sampesp/build_local.sh /caminho/android-ndk-r27c /caminho/saida
 ```
 
-Todas as opções aceitam `on` e `off`. Os comandos desse namespace são interceptados na fila local do teclado; não são registrados como comandos de servidor. O ciclo normal de envio recebe uma string vazia para finalizar o teclado; o tratamento desse envio vazio ainda precisa de teste no cliente. Comandos de outros nomes e mensagens normais passam sem alteração e não são gravados no log. Não usa o comando `/esp`, que poderia conflitar com o servidor.
+O script usa o compilador do NDK para **Android ARM64, API 23**, vincula a biblioteca C++ estaticamente e gera `libsampesp.so`. O download do NDK é necessário apenas na primeira preparação do ambiente. As compilações seguintes reutilizam essa instalação. O workflow do GitHub continua disponível como alternativa.
 
-`alyn_esp.log` registra `SIMPLE_UI CMD /alynesp hook installed`, `TOUCH position/button hook installed`, `CMD RECEBIDO`, `TOQUE` e contadores `commands`, `presses`, `panel_frames`. Se o comando funcionar e o botão não, esses contadores ajudam a separar falha de entrada e de desenho. As assinaturas, entradas e layout de strings foram conferidos na biblioteca enviada. Há testes de fila, strings curtas/longas, passagem de chat, desenho, toque duplicado, seleção e opções. O APK Android ainda exige teste no aparelho.
-
-O código da janela anterior e seus testes permanecem como referência; o hook `EndFrame` não é instalado na 0.3.1.
-
-## Novidades da 0.2.0
-
-- Barra vertical de vida à esquerda do ESP Box, preenchida de baixo para cima usando a vida sincronizada do cliente Alyn. A vida interna de 1000 usada pelo GTA para os remotos não é usada nessa barra.
-- Cores: **verde acima de 75**, **amarelo acima de 50 até 75**, **laranja acima de 25 até 50**, **vermelho de 0 a 25**. Cinza indica falta de um valor sincronizado recente. A referência de preenchimento é 100; números maiores continuam disponíveis na lista.
-- Na versão original, botão **MENU ESP** no alto, ao centro, com tema inspirado em San Andreas. Abre controles separados para **ESP Box**, **Barra de vida** e **ESP Line**. Desligar a caixa também oculta a barra; a linha tem controle independente. As opções valem durante a sessão e voltam ligadas ao reiniciar.
-- Lista **Jogadores próximos**, ordenada por distância, com ID e vida. Selecione uma linha para mostrar também o colete. A seleção é somente para consulta, sem ação de dano.
-- Mantém o arquivo de diagnóstico e a dependência mínima AML 1.3.1.
-
-Detalhes da análise, offsets específicos e limites das conclusões sobre dano: [ANALISE.md](ANALISE.md).
+A rotina da sniper e seus limites estão em [SNIPER.md](SNIPER.md). A análise do cliente está em [ANALISE.md](ANALISE.md); as partes referentes à interface descrevem versões antigas.
 
 ## Instalação
 
@@ -79,7 +37,7 @@ Requer AML 1.3.1 ou superior carregado pelo APK do SA-MP, além das bibliotecas 
 - Não testa oclusão por paredes. Alvos parcialmente fora da tela têm as linhas recortadas antes do desenho.
 - Só funciona com personagens que já estejam carregados no cliente. Não revela jogadores fora do streaming, não consulta posições no servidor e não altera pacotes de rede.
 - A seleção usa `CPed::IsPlayer` do GTA (tipos 0 e 1), e não uma lista de IDs extraída de `CPlayerPool` do SA-MP. Bots ou personagens de outros mods classificados como jogadores pelo GTA também podem aparecer; isso precisa ser conferido no servidor usado.
-- O menu usa desenho e fonte do GTA. O toque é observado nos eventos de entrada do ImGui do cliente, sem depender de janelas ImGui. Não bloqueia controles subjacentes; possíveis conflitos precisam de teste no aparelho. O comando local oferece um caminho independente do toque.
+- Esta versão não possui interface de menu, botão ou interceptação do chat/toque.
 
 ## Compatibilidade analisada
 

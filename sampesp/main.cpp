@@ -10,7 +10,7 @@
 #include "sniper_aim.h"
 #include "render_hook.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.3, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.4, Custom)
 // AML calls below exist since 1.0.1 or earlier; allow the reported AML 1.3.1.
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.3.1)
@@ -77,7 +77,7 @@ void initializeLog(){
         }
     }
     auto path=fileLog.filename();
-    fileLog.write("===== Alyn ESP 0.3.3 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+    fileLog.write("===== Alyn ESP 0.3.4 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
 }
 struct FrameStats {
     const char* reason="scanned";
@@ -90,17 +90,14 @@ FrameStats* currentStats=nullptr;
 uint64_t lastReport=0;
 struct FrameReport {
     FrameStats stats;
-    std::vector<clientui::Row> candidates;
     FrameReport(){currentStats=&stats;}
     ~FrameReport(){
         currentStats=nullptr;
-        clientui::publish(std::move(candidates));
         uint64_t now=diagnostics::millis();if(lastReport&&now-lastReport<5000)return;lastReport=now;
         fileLog.write("FRAME reason=%s screen=%.0fx%.0f slots=%d free=%d null=%d self=%d not_player=%d players=%d no_rw=%d dead=%d other_area=%d too_far=%d bad_position=%d drawn=%d polygon_calls=%d",
             stats.reason,width,height,stats.slots,stats.free,stats.nullPed,stats.self,stats.notPlayer,stats.players,stats.noRw,stats.dead,stats.area,stats.range,stats.badPos,stats.drawn,stats.quads);
-        fileLog.write("FEATURES box=%d line=%d health=%d synced_health=%d unknown_health=%d gui_frames=%llu menu_open=%d open_requests=%llu panel_frames=%llu",int(clientui::boxEnabled.load()),int(clientui::lineEnabled.load()),int(clientui::healthEnabled.load()),stats.syncedHealth,stats.unknownHealth,(unsigned long long)clientui::frames.load(),int(clientui::menuOpen.load()),(unsigned long long)clientui::openRequests.load(),(unsigned long long)clientui::panelFrames.load());
-        fileLog.write("SIMPLE_UI commands=%llu presses=%llu native_font=%d",(unsigned long long)simpleui::commandCount.load(),(unsigned long long)simpleui::touchCount.load(),int(simpleui::fontReady));
-        fileLog.write("SNIPER installed=%d enabled=%d zoom=%d scoped=%d mode=%d weapon=%d target_id=%d fov=%.3f",int(sniper::installed),int(clientui::aimEnabled.load()),int(clientui::zoomEnabled.load()),int(sniper::scoped.load()),sniper::reportedMode.load(),sniper::reportedWeapon.load(),sniper::lockedId.load(),sniper::reportedFov.load());
+        fileLog.write("FEATURES box=%d line=%d health=%d synced_health=%d unknown_health=%d ui=removed",int(options::boxEnabled.load()),int(options::lineEnabled.load()),int(options::healthEnabled.load()),stats.syncedHealth,stats.unknownHealth);
+        fileLog.write("SNIPER installed=%d enabled=%d zoom=%d scoped=%d mode=%d weapon=%d target_id=%d fov=%.3f",int(sniper::installed),int(options::aimEnabled.load()),int(options::zoomEnabled.load()),int(sniper::scoped.load()),sniper::reportedMode.load(),sniper::reportedWeapon.load(),sniper::lockedId.load(),sniper::reportedFov.load());
         fileLog.write("FILTER no_hierarchy=%d bad_hierarchy=%d missing_bone=%d sample_tag=%d sample_index=%d sample_node_count=%d invalid_bone_position=%d stale_bone=%d projection_failed=%d sample_depth=%.3f invalid_box=%d offscreen=%d ped_types_0_to_6=%d,%d,%d,%d,%d,%d,%d other_types=%d",
             stats.noHierarchy,stats.badHierarchy,stats.missingBone,stats.missingTag,stats.missingIndex,stats.nodeCount,stats.badBonePos,stats.staleBone,stats.projection,stats.failedDepth,stats.badBox,stats.offscreen,
             stats.types[0],stats.types[1],stats.types[2],stats.types[3],stats.types[4],stats.types[5],stats.types[6],stats.types[7]);
@@ -164,9 +161,6 @@ void rectangle(float left,float top,float right,float bottom,Color color){
     if(currentStats)++currentStats->quads;
     polygon(left,top,right,top,left,bottom,right,bottom,color);
 }
-void uiRectangle(float left,float top,float right,float bottom,simpleui::Color color){
-    rectangle(left,top,right,bottom,{color.r,color.g,color.b,color.a});
-}
 void drawHealth(Box box,bool known,float value,float scale){
     float right=box.left-4*scale,left=right-4*scale;
     rectangle(left-scale,box.top-scale,right+scale,box.bottom+scale,{0,0,0,220});
@@ -228,7 +222,6 @@ void draw(){
     stats.slots=pool->size;
     width=read<int>(screen,8);height=read<int>(screen,12);
     if(width<1||height<1||width>32768||height>32768){stats.reason="invalid_screen_size";return;}
-    simpleui::frame(width,height);
     Vec origin=position(self);if(!esp::finite(origin)){stats.reason="invalid_local_position";return;}
     int drawn=0;
     for(int i=0;i<pool->size&&drawn<maxDrawn;++i){
@@ -246,8 +239,8 @@ void draw(){
         float dx=center.x-origin.x,dy=center.y-origin.y,dz=center.z-origin.z;
         if(dx*dx+dy*dy+dz*dz>range*range){++stats.range;continue;}
         health::Sample hp{};bool known=features::healthCache.get(ped,diagnostics::millis(),hp);
-        if(known){++stats.syncedHealth;report.candidates.push_back({hp.id,hp.hp,hp.armour,std::sqrt(dx*dx+dy*dy+dz*dz)});}else ++stats.unknownHealth;
-        bool boxes=clientui::boxEnabled.load(),lines=clientui::lineEnabled.load();
+        if(known)++stats.syncedHealth;else ++stats.unknownHealth;
+        bool boxes=options::boxEnabled.load(),lines=options::lineEnabled.load();
         if(!boxes&&!lines){stats.reason="overlay_disabled";continue;}
         Box box{};if(!playerBox(ped,center,box))continue;
         Point a{width*.5f,height-3.f},b{(box.left+box.right)*.5f,box.bottom};
@@ -255,7 +248,7 @@ void draw(){
         if(lines)segment(a,b,3.5f*scale,outline);
         if(boxes)boxEdges(box,3.8f*scale,outline);
         if(lines)segment(a,b,1.5f*scale,green);
-        if(boxes){boxEdges(box,1.8f*scale,green);if(clientui::healthEnabled.load())drawHealth(box,known,hp.hp,scale);}
+        if(boxes){boxEdges(box,1.8f*scale,green);if(options::healthEnabled.load())drawHealth(box,known,hp.hp,scale);}
         ++drawn;++stats.drawn;
     }
 }
@@ -287,11 +280,9 @@ extern "C" JNIEXPORT void OnAllModsLoaded(){
     fileLog.write("RENDER install=Idle_BL call_offset=0x4d9108 instruction=0x%08x entry_words=%016llx,%016llx,%016llx",call,(unsigned long long)entry0,(unsigned long long)entry8,(unsigned long long)entry16);
     if(!renderhook::install(aml,base,reinterpret_cast<void*>(draw),reinterpret_cast<void**>(&original2D))){phase="render_hook_failed";log("RENDER Idle BL hook failed or call changed; no entry-hook fallback; disabled");return;}
     fileLog.write("RENDER Idle BL installed; original=0x%llx; Render2dStuff entry left untouched",(unsigned long long)reinterpret_cast<uintptr_t>(original2D));
-    simpleui::event=log;simpleui::rect=uiRectangle;
-    simpleui::installFont(aml,handle,base);
     sniper::install(aml,handle,base,log);
     phase="hook_installed";
-    log("Alyn ESP 0.3.3 ready; hook installed; waiting for first render callback and matching client");
+    log("Alyn ESP 0.3.4 ready; hook installed; waiting for first render callback and matching client");
 }
 
 extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

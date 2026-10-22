@@ -24,7 +24,7 @@ void reset(){scoped=false;zoomActive=false;lockedPed=nullptr;lockedId=-1;}
 uint8_t* activeCam(){unsigned index=read<uint8_t>(camera,95);return index<3?camera+376+index*552:nullptr;}
 Vec position(void* p){void* matrix=read<void*>(p,24);return matrix?read<Vec>(matrix,48):read<Vec>(p,8);}
 bool validScope(void* cam,void* player){
-    if(!clientReady||!player||cam!=activeCam()||clientui::menuOpen.load())return false;
+    if(!clientReady||!player||cam!=activeCam())return false;
     int mode=read<int16_t>(cam,14);if(mode!=7&&mode!=46)return false;
     if(read<void*>(cam,504)!=player)return false;
     if(!read<bool>(camera,49)||read<bool>(camera,67)||read<bool>(camera,2408))return false;
@@ -70,7 +70,7 @@ void process(void* cam){
     if(!validScope(cam,self)){reset();return;}
     scoped=true;
     float nativeFov=read<float>(cam,140);
-    if(clientui::zoomEnabled){
+    if(options::zoomEnabled){
         if(!zoomActive){customFov=sniper_math::zoom(nativeFov,false,false,0);zoomActive=true;}
         void* controls=pad(0);bool in=controls&&zoomIn(controls),out=controls&&zoomOut(controls);
         float step=timeStep?*timeStep:1;
@@ -78,7 +78,7 @@ void process(void* cam){
         customFov=sniper_math::zoom(customFov,in,out,step*.02f);
         write(cam,140,customFov);write(cam,144,0.f);reportedFov=customFov;
     }else{zoomActive=false;reportedFov=nativeFov;}
-    if(!clientui::aimEnabled){lockedPed=nullptr;lockedId=-1;return;}
+    if(!options::aimEnabled){lockedPed=nullptr;lockedId=-1;return;}
     Vec source=read<Vec>(cam,372),front{},right{},up{};
     if(!esp::finite(source)||!sniper_math::basis(read<Vec>(cam,360),front,right,up)){lockedPed=nullptr;lockedId=-1;return;}
     float w=read<int>(screen,8),h=read<int>(screen,12);if(w<1||h<1)return;
@@ -102,7 +102,7 @@ void process(void* cam){
 }
 void setFov(float value,bool special){
     originalFov(value,special);
-    if(!scoped||!clientui::zoomEnabled||clientui::menuOpen.load()||!zoomActive)return;
+    if(!scoped||!options::zoomEnabled||!zoomActive)return;
     uint8_t* cam=activeCam();void* self=localPed(-1);
     if(!cam||!validScope(cam,self))return;
     // The stock SetFOV adds a widescreen correction. Keep the extended scope

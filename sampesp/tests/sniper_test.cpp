@@ -26,7 +26,7 @@ int main(){
     for(int i=0;i<3;++i){put(peds[i],8,points[i]);put(peds[i],32,static_cast<void*>(peds[i]));put(peds[i],1708,1000.f);put(peds[i],1824,0);}
     put(peds[0],2268,uint8_t(6));put(peds[0],1840+6*32,34);
     auto* cam=sniper::activeCam();put(cam,14,int16_t(7));put(cam,504,static_cast<void*>(peds[0]));
-    sniper::clientReady=true;clientui::menuOpen=false;clientui::aimEnabled=true;clientui::zoomEnabled=true;
+    sniper::clientReady=true;options::aimEnabled=true;options::zoomEnabled=true;
     sniper::process(cam);assert(calls==1&&sniper::lockedPed==peds[1]); // Farther in the world, closer to the red dot.
     Vec front=sniper::read<Vec>(cam,360);assert(front.x>0&&front.x<.002f&&front.y>.999f);
     float alpha=sniper::read<float>(cam,132),beta=sniper::read<float>(cam,148);
@@ -40,13 +40,12 @@ int main(){
     put(peds[1],1824,0);missing=true;sniper::process(cam);assert(!sniper::lockedPed);missing=false;
     health::Sample entry{peds[1],peds[1],42,0,0,diagnostics::millis()};features::healthCache.update(entry);sniper::process(cam);assert(!sniper::lockedPed); // Synthetic GTA HP must not override synced death.
     features::healthCache.remove(peds[1]);sniper::process(cam);assert(sniper::lockedPed==peds[1]);
-    clientui::aimEnabled=false;sniper::process(cam);assert(!sniper::lockedPed&&sniper::read<Vec>(cam,360).x==0);
-    clientui::aimEnabled=true;clientui::menuOpen=true;sniper::process(cam);assert(!sniper::scoped&&!sniper::lockedPed&&sniper::read<float>(cam,140)==12);
-    clientui::menuOpen=false;put(peds[0],1840+6*32,33);sniper::process(cam);assert(!sniper::scoped&&!sniper::lockedPed);
+    options::aimEnabled=false;sniper::process(cam);assert(!sniper::lockedPed&&sniper::read<Vec>(cam,360).x==0);
+    options::aimEnabled=true;put(peds[0],1840+6*32,33);sniper::process(cam);assert(!sniper::scoped&&!sniper::lockedPed);
     put(peds[0],1840+6*32,34);put(cam,14,int16_t(4));sniper::process(cam);assert(!sniper::scoped&&sniper::read<float>(cam,140)==70);sniper::setFov(70,false);assert(fieldFov==81);
     put(cam,14,int16_t(7));sniper::clientReady=false;sniper::process(cam);assert(!sniper::scoped&&!sniper::lockedPed);
-    sniper::clientReady=true;clientui::zoomEnabled=false;sniper::process(cam);sniper::setFov(12,false);assert(!sniper::zoomActive&&fieldFov==23);
-    clientui::zoomEnabled=true;put(peds[0],1708,0.f);sniper::process(cam);assert(!sniper::scoped);
+    sniper::clientReady=true;options::zoomEnabled=false;sniper::process(cam);sniper::setFov(12,false);assert(!sniper::zoomActive&&fieldFov==23);
+    options::zoomEnabled=true;put(peds[0],1708,0.f);sniper::process(cam);assert(!sniper::scoped);
     put(peds[0],1708,100.f);put(sniper::camera,2408,true);sniper::process(cam);assert(!sniper::scoped);put(sniper::camera,2408,false);
     std::cout<<"Sniper tests passed: closest crosshair target, visibility, scope/weapon gating, zoom limits and native FOV restoration\n";
 }

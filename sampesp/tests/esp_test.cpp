@@ -81,9 +81,8 @@ int main(){
     setup();int remoteMarker=0;
     features::healthCache.update({&remoteMarker,peds[1],42,25,10,diagnostics::millis()});
     quads=0;colors.clear();draw();assert(quads==13&&colors.back().r==240&&colors.back().g==45);
-    clientui::boxEnabled=false;clientui::lineEnabled=false;quads=0;draw();assert(quads==0);
-    clientui::lineEnabled=true;draw();assert(quads==2);
-    clientui::boxEnabled=true;clientui::lineEnabled=false;quads=0;draw();assert(quads==11);
-    assert(!clientui::rows.empty()&&clientui::rows[0].id==42&&clientui::rows[0].hp==25);
+    options::boxEnabled=false;options::lineEnabled=false;quads=0;draw();assert(quads==0);
+    options::lineEnabled=true;draw();assert(quads==2);
+    options::boxEnabled=true;options::lineEnabled=false;quads=0;draw();assert(quads==11);
     std::cout<<"ESP tests passed: player filter, skeleton boxes, lines, clipping and client build check\n";
 }

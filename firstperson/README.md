@@ -1,58 +1,73 @@
-# Head Camera 0.1.0 — GTA SA 2.10 ARM64 / AML 1.4
+# Head Camera 0.2.0 — GTA SA 2.10 ARM64 / AML 1.4
 
-Protótipo independente de primeira pessoa. Inspirado no comportamento solicitado,
-não é um port do código de First Person Mod v3.0 Fixed e não promete os mesmos recursos.
+Implementação própria inspirada no First Person Mod v3.0 Fixed.
+
+## Mudanças em 0.2.0
+
+- O desenho de CJ não é mais bloqueado: torso, braços e pernas usam a renderização normal.
+- A cabeça e os ossos faciais padrão são alinhados temporariamente ao olhar durante
+  o desenho. A transformação preserva a escala e a distância entre os ossos.
+- Os dados dos ossos são restaurados byte a byte após o desenho. Reflexos mantêm o
+  caminho nativo quando a flag de espelho do jogo está ativa.
+- O ponto de visão usa o deslocamento reconstruído da configuração original de CJ:
+  0,11962963 para frente e 0,09370371 para cima, na base local da câmera.
+- O plano de corte próximo passa a 0,053333335, conforme o cfg analisado.
+- A câmera recebe metade da inclinação lateral animada, com limite final de 15 graus.
+- Continua usando a direção de olhar dos controles nativos de toque.
+
+A análise do mod de PC mostrou alinhamento da cabeça e deslocamento dos olhos;
+não confirmou que ele apague a cabeça. Esta implementação adapta essa ideia ao
+Android manipulando temporariamente matrizes de skin no desenho. Não copia a
+rotina binária de PC nem garante reprodução idêntica de todas as suas animações.
 
 ## Comportamento
 
-- Ativa automaticamente quando instalado.
-- Posiciona a câmera na cabeça animada de CJ ao andar e nos modos nativos de seguir veículos.
-- Mantém a direção de visão e os controles de olhar do jogo.
-- Ao entrar e sair do veículo, continua tentando acompanhar a cabeça enquanto
-  o jogo usar os modos de acompanhamento permitidos.
-- Oculta o modelo inteiro de CJ durante a primeira pessoa para evitar enxergar
-  o interior da cabeça. NPCs continuam visíveis.
-- Usa plano de corte próximo de 0,06 para permitir visualizar a cabine.
-- Cenas, widescreen, morte e modos especiais de câmera/mira mantêm a câmera nativa.
-- Não implementa braços/armas em primeira pessoa, inclinação conforme a orientação
-  do osso, menu, botão de alternância ou configurações por modelo de veículo.
+Ativa automaticamente quando instalada. Segue a cabeça ao andar e nos modos nativos
+de acompanhar veículos, incluindo as animações de entrada/saída enquanto esses modos
+permanecem ativos. Cenas, widescreen, morte e modos especiais de mira mantêm a câmera
+do jogo. FOV permanece nativo.
 
-## Compilar no GitHub
+Não inclui braços/armas com animações novas, rotação independente completa do corpo,
+controle de olhar próprio para veículos, offsets por modelo, menu ou botão de alternância.
+As mãos que aparecerem são as animações normais do personagem. O enquadramento depende
+do modelo do veículo e da animação. Não foram aplicadas sem validação as 40 entradas
+de veículos do cfg de PC.
 
-Actions → Build First Person ARM64 → Run workflow. O workflow também inicia
-quando os arquivos de firstperson, seus cabeçalhos AML ou o próprio workflow mudam.
-Baixe o artefato `HeadCam-ARM64` e extraia `libheadcam.so`.
+## Baixar e instalar
 
-## Instalar
+Actions → Build First Person ARM64 → abra a execução mais recente com sucesso →
+Artifacts → HeadCam-ARM64. Extraia `libheadcam.so` do ZIP.
 
-Com o GTA fechado, coloque `libheadcam.so` na pasta de mods do AML onde está
-`libnpclines.so`. São mods separados; este não precisa do ESP para funcionar.
-Para o primeiro teste, use apenas HeadCam entre os mods opcionais para facilitar
-identificar problemas. Abra um save, ande e entre num carro padrão.
-Para desativar, feche o jogo e remova apenas `libheadcam.so`.
+Feche o GTA e substitua a versão anterior de `libheadcam.so` na pasta de mods do AML.
+Não mantenha a antiga renomeada com extensão `.so`, pois o AML pode carregar ambas.
+O ESP `libnpclines.so` é um mod separado. Para o primeiro teste, use somente HeadCam
+entre os mods opcionais para facilitar identificar problemas.
 
-Se fechar ou ficar com a câmera incorreta, envie o crashlog e descreva a ação
-(ex.: andando, entrando no carro, dirigindo ou saindo).
-Logs de inicialização usam a tag `HeadCam`.
+Abra um save, ande, olhe para baixo, entre num carro padrão, dirija e saia.
+Para desativar, feche o jogo e remova `libheadcam.so`.
 
-## Validação e limites
+## Validação
 
-Biblioteca alvo, SHA-256:
+- Símbolos e estruturas conferidos na libGTASA.so ARM64 fornecida, incluindo
+  RpHAnimHierarchy (matrizes em +8), RwMatrixTag (64 bytes) e CCam/CCamera.
+- Testes com memória/funções simuladas verificam câmera e near clip, restauração dos
+  eixos nativos entre quadros, desenho do CJ, rotação rígida dos ossos faciais,
+  preservação do restante do corpo, restauração byte a byte, espelhos e dados inválidos.
+- Testes locais também passaram com AddressSanitizer e UndefinedBehaviorSanitizer
+  (checagem de vptr e LeakSanitizer desativadas devido ao mock AML e ao executor).
+- O workflow executa os testes e compila com Android NDK para ARM64.
+
+Ainda precisa ser validado no aparelho: rosto/cabelo/acessórios obstruindo a câmera,
+renderização de cabine, atraso entre câmera e animação, reflexos, skins modificadas e
+entrada/saída de veículos. Caso a estrutura do esqueleto não seja válida, o mod mantém
+a câmera nativa. Essa verificação não valida toda alteração feita por outro plugin.
+
+Biblioteca alvo SHA-256:
 `92b3714534742cf8e31eba35dbfd5e83871ecb5b936f5519d9b6ef3562234f9e`.
 
-Offsets de CCam, CCamera, CPed, CPlaceable e RwCamera conferidos nos dados DWARF
-fornecidos. Os endereços relativos dos símbolos também são verificados ao carregar;
-outros builds são rejeitados. Isso não valida patches feitos por outros mods.
-
-O workflow compila com Android NDK. Testes no host usam memória e funções simuladas
-para verificar aplicação/restauração da posição e do near clip, exclusão de modos
-especiais, ocultação somente de CJ e rejeição de ossos inválidos.
-Esses testes não executam o motor do GTA e não validam ABI ou renderização no aparelho.
-
-Ainda não foi testado em um Android real: animações de entrada/saída, colisões com
-paredes, veículos modificados, reflexos, retrovisores e interação com missões precisam
-ser avaliados. Modelos sem cabine detalhada podem mostrar partes ausentes por dentro.
-O plano próximo reduz a precisão de profundidade e pode produzir artefatos à distância.
+Se fechar, envie o novo crashlog. Se houver problema visual, envie um vídeo curto e
+indique se acontece andando, olhando para baixo, entrando, dirigindo ou saindo.
+Logs usam a tag `HeadCam` e a versão `0.2.0`.
 
 ## Compilar com NDK local
 
@@ -64,4 +79,4 @@ cmake -S firstperson -B build-firstperson \
 cmake --build build-firstperson --parallel 2
 ```
 
-Cabeçalhos AML e respectiva licença estão em `../mod/`.
+Cabeçalhos AML e sua licença: `../mod/`.

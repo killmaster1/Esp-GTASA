@@ -5,8 +5,9 @@
 #include <cstddef>
 #include <cstring>
 #include "overlay_math.h"
+#include "diagnostics.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.1.0, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.1.1, Custom)
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.4.0)
 END_DEPLIST()
@@ -33,13 +34,82 @@ bool sampReady=false;
 unsigned retryFrames=0;
 float width=0,height=0;
 template<class T>T read(const void* p,size_t off){T v;std::memcpy(&v,static_cast<const uint8_t*>(p)+off,sizeof(v));return v;}
-void log(const char* s){__android_log_write(ANDROID_LOG_INFO,"AlynESP",s);}
+diagnostics::Log fileLog;
+std::atomic<uint64_t> renderFrames{0};
+std::atomic<const char*> phase{"not_initialized"};
+class Watchdog {
+    std::mutex mutex;std::condition_variable cv;bool stopping=false;std::thread worker;
+public:
+    void start(){
+        if(worker.joinable())return;
+        worker=std::thread([this]{
+            uint64_t previous=renderFrames.load();
+            std::unique_lock<std::mutex> lock(mutex);
+            while(!cv.wait_for(lock,std::chrono::seconds(5),[this]{return stopping;})){
+                uint64_t frames=renderFrames.load();const char* status=phase.load();
+                lock.unlock();
+                fileLog.write("WATCHDOG phase=%s render_frames=%llu frames_last_5s=%llu%s",status,
+                    (unsigned long long)frames,(unsigned long long)(frames-previous),
+                    frames==previous?" (no render callback: game/menu state or hook must be checked)":"");
+                previous=frames;lock.lock();
+            }
+        });
+    }
+    void stop(){
+        {std::lock_guard<std::mutex> lock(mutex);stopping=true;}cv.notify_all();
+        if(worker.joinable())worker.join();
+    }
+    ~Watchdog(){stop();}
+} watchdog;
+void log(const char* s){fileLog.write("%s",s);}
+void initializeLog(){
+    if(!fileLog.filename().empty())return;
+    if(aml){
+        const char* external=aml->GetAndroidDataPath();
+        if(!fileLog.openDirectory(external)){
+            const char* config=aml->GetConfigPath();
+            if(!fileLog.openDirectory(config))fileLog.openDirectory(aml->GetDataPath());
+        }
+    }
+    auto path=fileLog.filename();
+    fileLog.write("===== Alyn ESP 0.1.1 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+}
+struct FrameStats {
+    const char* reason="scanned";
+    int slots=0,free=0,nullPed=0,self=0,notPlayer=0,players=0,noRw=0,dead=0,area=0,range=0,badPos=0;
+    int noHierarchy=0,badHierarchy=0,missingBone=0,badBonePos=0,staleBone=0,projection=0,badBox=0,offscreen=0,drawn=0,quads=0;
+    int missingTag=-1,missingIndex=-1,nodeCount=0,types[8]{};
+    float failedDepth=0;
+};
+FrameStats* currentStats=nullptr;
+uint64_t lastReport=0;
+struct FrameReport {
+    FrameStats stats;
+    FrameReport(){currentStats=&stats;}
+    ~FrameReport(){
+        currentStats=nullptr;
+        uint64_t now=diagnostics::millis();if(lastReport&&now-lastReport<5000)return;lastReport=now;
+        fileLog.write("FRAME reason=%s screen=%.0fx%.0f slots=%d free=%d null=%d self=%d not_player=%d players=%d no_rw=%d dead=%d other_area=%d too_far=%d bad_position=%d drawn=%d polygon_calls=%d",
+            stats.reason,width,height,stats.slots,stats.free,stats.nullPed,stats.self,stats.notPlayer,stats.players,stats.noRw,stats.dead,stats.area,stats.range,stats.badPos,stats.drawn,stats.quads);
+        fileLog.write("FILTER no_hierarchy=%d bad_hierarchy=%d missing_bone=%d sample_tag=%d sample_index=%d sample_node_count=%d invalid_bone_position=%d stale_bone=%d projection_failed=%d sample_depth=%.3f invalid_box=%d offscreen=%d ped_types_0_to_6=%d,%d,%d,%d,%d,%d,%d other_types=%d",
+            stats.noHierarchy,stats.badHierarchy,stats.missingBone,stats.missingTag,stats.missingIndex,stats.nodeCount,stats.badBonePos,stats.staleBone,stats.projection,stats.failedDepth,stats.badBox,stats.offscreen,
+            stats.types[0],stats.types[1],stats.types[2],stats.types[3],stats.types[4],stats.types[5],stats.types[6],stats.types[7]);
+    }
+};
+int inventory(dl_phdr_info* info,size_t,void*){
+    const char* p=info->dlpi_name;
+    if(p&&(std::strstr(p,"GTASA")||std::strstr(p,"SAMP")||std::strstr(p,"samp")||std::strstr(p,"Alyn")||std::strstr(p,"aml")||std::strstr(p,"AML")))
+        fileLog.write("MODULE path=%s base=0x%llx",p,(unsigned long long)info->dlpi_addr);
+    return 0;
+}
 Vec position(const void* ped){void* m=read<void*>(ped,24);return m?read<Vec>(m,48):read<Vec>(ped,8);}
 // Only inspect loaded modules. Do not dlopen the multiplayer client as a side effect.
 int findSamp(dl_phdr_info* info,size_t,void* result){
     const char* path=info->dlpi_name;if(!path)return 0;
     const char* name=std::strrchr(path,'/');name=name?name+1:path;
     if(std::strcmp(name,"libAlyn_SAMPMOBILE.so"))return 0;
+    static bool reported=false;
+    if(!reported)fileLog.write("CLIENT found path=%s base=0x%llx",path,(unsigned long long)info->dlpi_addr);
     constexpr uint8_t expected[]{0xa8,0x61,0x94,0x42,0x04,0xc6,0x30,0x9b,0xb4,0x33,0xb7,0xe2,0xbe,0x8a,0x2f,0x13,0xc1,0x37,0xae,0x66};
     for(int i=0;i<info->dlpi_phnum;++i){
         const auto& segment=info->dlpi_phdr[i];if(segment.p_type!=PT_NOTE||segment.p_memsz>65536)continue;
@@ -49,12 +119,18 @@ int findSamp(dl_phdr_info* info,size_t,void* result){
             auto note=read<ElfW(Nhdr)>(data,off);off+=sizeof(note);
             size_t nameSize=(size_t(note.n_namesz)+3)&~size_t(3),descSize=(size_t(note.n_descsz)+3)&~size_t(3);
             if(nameSize>segment.p_memsz-off||descSize>segment.p_memsz-off-nameSize)break;
+            if(!reported&&note.n_type==NT_GNU_BUILD_ID&&note.n_namesz==4&&note.n_descsz<=64&& !std::memcmp(data+off,"GNU\0",4)){
+                char actual[129]{};for(unsigned j=0;j<note.n_descsz;++j)std::snprintf(actual+j*2,3,"%02x",data[off+nameSize+j]);
+                fileLog.write("CLIENT build_id=%s expected=a861944204c6309bb433b7e2be8a2f13c137ae66",actual);
+            }
             if(note.n_type==NT_GNU_BUILD_ID&&note.n_namesz==4&&note.n_descsz==sizeof(expected)&&!std::memcmp(data+off,"GNU\0",4)&&!std::memcmp(data+off+nameSize,expected,sizeof(expected))){
-                *static_cast<bool*>(result)=true;return 1;
+                *static_cast<bool*>(result)=true;reported=true;return 1;
             }
             off+=nameSize+descSize;
         }
-    }return 0;
+    }
+    if(!reported)log("CLIENT rejected: build ID missing, malformed or different; drawing remains disabled");
+    reported=true;return 0;
 }
 void segment(Point a,Point b,float thickness,Color color){
     // Clip before constructing a quad so partially visible targets stay bounded.
@@ -63,6 +139,7 @@ void segment(Point a,Point b,float thickness,Color color){
     if(!std::isfinite(len)||len<.5f)return;
     float nx=-dy/len*thickness*.5f,ny=dx/len*thickness*.5f;
     // Static Draw2DPolygon, not the instance DrawTriangle method.
+    if(currentStats)++currentStats->quads;
     polygon(a.x+nx,a.y+ny,a.x-nx,a.y-ny,b.x+nx,b.y+ny,b.x-nx,b.y-ny,color);
 }
 void boxEdges(Box b,float thickness,Color color){
@@ -75,74 +152,99 @@ bool playerBox(void* ped,Vec center,Box& box){
     // Head, pelvis, hands and feet. Native bone tag IDs, not skin matrix indices.
     constexpr unsigned bones[]{5,1,24,34,44,54};Point points[6]{};
     void* hierarchy=hierarchyFromClump(read<void*>(ped,32));
-    if(!hierarchy)return false;
-    int count=read<int>(hierarchy,4);if(count<1||count>256)return false;
+    if(!hierarchy){if(currentStats)++currentStats->noHierarchy;return false;}
+    int count=read<int>(hierarchy,4);if(count<1||count>256){if(currentStats){++currentStats->badHierarchy;currentStats->nodeCount=count;}return false;}
     for(int i=0;i<6;++i){
-        int index=boneIndex(hierarchy,int(bones[i]));if(index<0||index>=count)return false;
+        int index=boneIndex(hierarchy,int(bones[i]));if(index<0||index>=count){if(currentStats){++currentStats->missingBone;currentStats->missingTag=int(bones[i]);currentStats->missingIndex=index;currentStats->nodeCount=count;}return false;}
         Vec world{};bonePosition(ped,world,bones[i],false);
-        if(!esp::finite(world))return false;
+        if(!esp::finite(world)){if(currentStats)++currentStats->badBonePos;return false;}
         float dx=world.x-center.x,dy=world.y-center.y,dz=world.z-center.z;
         // Reject an unloaded/stale skeleton instead of drawing a huge box at map origin.
-        if(dx*dx+dy*dy+dz*dz>25.f)return false;
+        if(dx*dx+dy*dy+dz*dz>25.f){if(currentStats)++currentStats->staleBone;return false;}
         if(i==0)world.z+=.20f;
         if(i>=4)world.z-=.07f;
         Vec out{};float sx=0,sy=0;
         // Check the near plane; allow distant streamed players, up to our own range.
-        if(!project(world,&out,&sx,&sy,false,true)||!esp::finite(out)||out.z<=.05f)return false;
+        if(!project(world,&out,&sx,&sy,false,true)||!esp::finite(out)||out.z<=.05f){if(currentStats){++currentStats->projection;currentStats->failedDepth=out.z;}return false;}
         points[i]={out.x,out.y};
     }
-    if(!esp::makeBox(points,6,box))return false;
-    return box.right>=0&&box.left<width&&box.bottom>=0&&box.top<height;
+    if(!esp::makeBox(points,6,box)){if(currentStats)++currentStats->badBox;return false;}
+    bool visible=box.right>=0&&box.left<width&&box.bottom>=0&&box.top<height;
+    if(!visible&&currentStats)++currentStats->offscreen;
+    return visible;
 }
 void draw(){
+    ++renderFrames;
     original2D();
+    FrameReport report;auto& stats=report.stats;
     if(!sampReady){
-        if(retryFrames++%120==0){dl_iterate_phdr(findSamp,&sampReady);if(sampReady)log("Alyn client build verified; player boxes and lines enabled");}
-        if(!sampReady)return;
+        phase="waiting_for_client";
+        if(retryFrames++%120==0){
+            dl_iterate_phdr(findSamp,&sampReady);
+            if(sampReady){phase="active";log("Alyn client build verified; player boxes and lines enabled");}
+        }
+        if(!sampReady){
+            static uint64_t lastInventory=0;uint64_t now=diagnostics::millis();
+            if(!lastInventory||now-lastInventory>=15000){lastInventory=now;dl_iterate_phdr(inventory,nullptr);}
+            stats.reason="client_not_verified";return;
+        }
     }
+    phase="active";
     void* self=localPed(-1);Pool* pool=*poolPtr;
-    if(!self||!pool||!pool->storage||!pool->flags||pool->size<1||pool->size>100000)return;
+    if(!self){stats.reason="local_player_missing";return;}
+    if(!pool||!pool->storage||!pool->flags||pool->size<1||pool->size>100000){stats.reason="ped_pool_missing_or_invalid";return;}
+    stats.slots=pool->size;
     width=read<int>(screen,8);height=read<int>(screen,12);
-    if(width<1||height<1||width>32768||height>32768)return;
-    Vec origin=position(self);if(!esp::finite(origin))return;
+    if(width<1||height<1||width>32768||height>32768){stats.reason="invalid_screen_size";return;}
+    Vec origin=position(self);if(!esp::finite(origin)){stats.reason="invalid_local_position";return;}
     int drawn=0;
     for(int i=0;i<pool->size&&drawn<maxDrawn;++i){
-        uint8_t flag=pool->flags[i];if(flag&0x80)continue;
-        // Access via CPools, retaining the allocation handling provided by FLA.
+        uint8_t flag=pool->flags[i];if(flag&0x80){++stats.free;continue;}
         void* ped=getPed((i<<8)|flag);
-        if(!ped||ped==self||!isPlayer(ped)||!read<void*>(ped,32))continue;
+        if(!ped){++stats.nullPed;continue;}
+        if(ped==self){++stats.self;continue;}
+        uint32_t type=read<uint32_t>(ped,1824);++stats.types[type<7?type:7];
+        if(!isPlayer(ped)){++stats.notPlayer;continue;}++stats.players;
+        if(!read<void*>(ped,32)){++stats.noRw;continue;}
         float health=read<float>(ped,1708);
-        if(!std::isfinite(health)||health<=0)continue;
-        if(read<uint8_t>(ped,75)!=read<uint8_t>(self,75))continue;
-        Vec center=position(ped);if(!esp::finite(center))continue;
+        if(!std::isfinite(health)||health<=0){++stats.dead;continue;}
+        if(read<uint8_t>(ped,75)!=read<uint8_t>(self,75)){++stats.area;continue;}
+        Vec center=position(ped);if(!esp::finite(center)){++stats.badPos;continue;}
         float dx=center.x-origin.x,dy=center.y-origin.y,dz=center.z-origin.z;
-        if(dx*dx+dy*dy+dz*dz>range*range)continue;
+        if(dx*dx+dy*dy+dz*dz>range*range){++stats.range;continue;}
         Box box{};if(!playerBox(ped,center,box))continue;
         Point a{width*.5f,height-3.f},b{(box.left+box.right)*.5f,box.bottom};
         float scale=std::max(.8f,std::min(2.5f,height/720.f));
         segment(a,b,3.5f*scale,outline);boxEdges(box,3.8f*scale,outline);
-        segment(a,b,1.5f*scale,green);boxEdges(box,1.8f*scale,green);++drawn;
+        segment(a,b,1.5f*scale,green);boxEdges(box,1.8f*scale,green);++drawn;++stats.drawn;
     }
 }
 }
+extern "C" JNIEXPORT void OnModLoad(){initializeLog();log("CALLBACK OnModLoad reached");}
 extern "C" JNIEXPORT void OnAllModsLoaded(){
-    if(!aml)return;
+    initializeLog();phase="initializing";watchdog.start();log("CALLBACK OnAllModsLoaded reached");
+    dl_iterate_phdr(inventory,nullptr);
+    if(!aml){phase="aml_interface_missing";log("AML interface missing; disabled");return;}
     void* handle=aml->GetLibHandle("libGTASA.so");
-    if(!handle){log("GTA library missing; disabled");return;}
+    if(!handle){phase="gta_library_missing";log("GTA library missing; disabled");return;}
     const char* names[]{"_Z13Render2dStuffv","_Z13FindPlayerPedi","_ZN6CPools6GetPedEi","_ZNK4CPed8IsPlayerEv",
         "_ZN4CPed15GetBonePositionER5RwV3djb","_ZN7CSprite15CalcScreenCoorsERK5RwV3dPS0_PfS4_bb",
         "_ZN9CSprite2d13Draw2DPolygonEffffffffRK5CRGBA","_ZN6CPools11ms_pPedPoolE","RsGlobal",
         "_Z29GetAnimHierarchyFromSkinClumpP7RpClump","_Z17RpHAnimIDGetIndexP16RpHAnimHierarchyi"};
     constexpr uintptr_t offsets[]{0x4d8994,0x4efae0,0x4f2378,0x595400,0x59aee4,0x6e9df8,0x6ee4a4,0xbc3bb8,0xc9b320,0x6f54cc,0x255be8};
     uintptr_t symbols[11]{};
-    for(int i=0;i<11;++i){symbols[i]=aml->GetSym(handle,names[i]);if(!symbols[i]){log("Required GTA symbol missing; disabled");return;}}
+    for(int i=0;i<11;++i){symbols[i]=aml->GetSym(handle,names[i]);if(!symbols[i]){phase="required_symbol_missing";fileLog.write("Required GTA symbol missing: %s; disabled",names[i]);return;}}
     uintptr_t base=symbols[0]-offsets[0];
-    for(int i=1;i<11;++i)if(symbols[i]-base!=offsets[i]){log("Unsupported GTA library layout; disabled");return;}
+    for(int i=0;i<11;++i)fileLog.write("SYMBOL %s address=0x%llx offset=0x%llx expected=0x%llx",names[i],(unsigned long long)symbols[i],(unsigned long long)(symbols[i]-base),(unsigned long long)offsets[i]);
+    for(int i=1;i<11;++i)if(symbols[i]-base!=offsets[i]){phase="gta_layout_mismatch";fileLog.write("Unsupported GTA library layout at %s; disabled",names[i]);return;}
     localPed=reinterpret_cast<decltype(localPed)>(symbols[1]);getPed=reinterpret_cast<decltype(getPed)>(symbols[2]);
     isPlayer=reinterpret_cast<decltype(isPlayer)>(symbols[3]);bonePosition=reinterpret_cast<decltype(bonePosition)>(symbols[4]);
     project=reinterpret_cast<decltype(project)>(symbols[5]);polygon=reinterpret_cast<decltype(polygon)>(symbols[6]);
     poolPtr=reinterpret_cast<Pool**>(symbols[7]);screen=reinterpret_cast<uint8_t*>(symbols[8]);
     hierarchyFromClump=reinterpret_cast<decltype(hierarchyFromClump)>(symbols[9]);boneIndex=reinterpret_cast<decltype(boneIndex)>(symbols[10]);
-    if(!aml->Hook(reinterpret_cast<void*>(symbols[0]),reinterpret_cast<void*>(draw),reinterpret_cast<void**>(&original2D))){log("2D render hook failed; disabled");return;}
-    log("Alyn ESP 0.1.0 ready; awaiting matching loaded multiplayer client");
+    if(!aml->Hook(reinterpret_cast<void*>(symbols[0]),reinterpret_cast<void*>(draw),reinterpret_cast<void**>(&original2D))){phase="render_hook_failed";log("2D render hook failed; disabled");return;}
+    phase="hook_installed";
+    log("Alyn ESP 0.1.1 ready; hook installed; waiting for first render callback and matching client");
 }
+
+extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

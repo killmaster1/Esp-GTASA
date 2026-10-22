@@ -53,7 +53,10 @@ int main(){
     poolPtr=&poolValue;screen=fakeScreen;put(screen,8,1280);put(screen,12,720);
     setup();sampReady=true;draw();assert(renderCalls==1&&quads==10);
     assert(colors.size()==10&&colors.front().r==0&&colors.back().g==255);
-    missingBone=true;quads=0;draw();assert(quads==0);missingBone=false;
+    FrameStats rejected;currentStats=&rejected;Box rejectedBox{};
+    missingBone=true;assert(!playerBox(peds[1],position(peds[1]),rejectedBox));
+    assert(rejected.missingBone==1&&rejected.missingTag==5&&rejected.missingIndex==-1);currentStats=nullptr;
+    quads=0;draw();assert(quads==0);missingBone=false;
     // No client: render stays transparent and no ped pool access is required.
     sampReady=false;retryFrames=1;quads=0;draw();assert(quads==0);sampReady=true;
     // NPCs, dead players, the local player, freed slots and other interiors stay excluded.

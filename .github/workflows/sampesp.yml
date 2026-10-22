@@ -22,8 +22,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test player selection, clipping and overlay with simulated memory
         run: |
-          g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/esp_test.cpp -ldl -o /tmp/sampesp-test
+          g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/esp_test.cpp -ldl -pthread -o /tmp/sampesp-test
           /tmp/sampesp-test
+          g++ -std=c++14 -Isampesp/tests/host sampesp/tests/log_test.cpp -pthread -o /tmp/sampesp-log-test
+          /tmp/sampesp-log-test
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'

@@ -1,4 +1,4 @@
-# Alyn Player ESP 0.1.0 — ARM64 / AML
+# Alyn Player ESP 0.1.1 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
 
@@ -29,15 +29,40 @@ GTA: a `libGTASA.so` 2.10 ARM64 enviada anteriormente, SHA-256 `92b3714534742cf8
 
 O cliente tem os símbolos internos de jogadores removidos; esta versão não usa offsets presumidos de `CNetGame` ou `CPlayerPool`. A biblioteca original do cliente não é modificada nem distribuída neste projeto.
 
-## Diagnóstico e testes
+## Diagnóstico por arquivo (0.1.1)
 
-Tag de logcat: `AlynESP`.
+A `.so` tenta gravar **alyn_esp.log** nestas pastas fornecidas pelo próprio AML, na ordem:
 
-- `Alyn ESP 0.1.0 ready`: hook do GTA instalado, aguardando o cliente compatível.
-- `Alyn client build verified`: cliente encontrado, desenho habilitado.
-- `Unsupported GTA library layout` ou `Required GTA symbol missing`: GTA incompatível, mod desativado.
+1. Pasta externa do aplicativo: normalmente `Android/data/<pacote-do-SA-MP>/files/alyn_esp.log`.
+2. Pasta de configurações do AML: `alyn_esp.log` dentro dela.
+3. Pasta de dados internos do aplicativo: alternativa caso as anteriores não permitam gravar.
 
-Os testes com memória e funções simuladas cobrem filtro de personagens, ossos ausentes, caixa e linha, alvos parcialmente visíveis, coordenadas inválidas, ausência do cliente e identificação ELF. Não comprovam a classificação dos jogadores neste servidor nem a execução no aparelho. A compilação NDK também precisa ser seguida de teste real no celular.
+A pasta exata depende do APK e das configurações do AML. O caminho efetivamente usado também aparece no logcat, tag `AlynESP`. Se todas as tentativas falharem, os erros de abertura, com caminho e `errno`, ficam no logcat. O mod não pede permissões adicionais nem grava fora das pastas fornecidas pelo AML.
+
+Substitua a `.so` antiga com o jogo fechado, abra o cliente, entre no servidor, fique cerca de **30 segundos perto de outros jogadores**, feche normalmente o jogo e envie `alyn_esp.log`. O arquivo é atualizado durante a execução, com flush após cada evento. Ao atingir aproximadamente 512 KiB, a versão anterior vira `alyn_esp.log.previous`; são mantidos o arquivo atual e uma cópia anterior.
+
+O diagnóstico registra:
+
+- Entrada em `OnModLoad` e `OnAllModsLoaded`, bibliotecas carregadas e símbolos ausentes ou com endereço relativo divergente.
+- Caminho e Build ID do cliente encontrado, incluindo divergência da versão esperada.
+- Instalação do hook. Um monitor independente registra a cada cinco segundos se o callback de desenho foi chamado. Zero chamadas também pode ocorrer em menus, com jogo pausado ou sem renderização, portanto isoladamente não prova conflito de hooks.
+- A cada cinco segundos, o motivo de interrupção e contadores de slots, tipos de pedestre, candidatos a jogador, descartes, caixas e chamadas ao desenho.
+- Motivos dos descartes: vida, distância, interior, ausência de modelo ou hierarquia, osso ausente, posição inválida, projeção e alvo fora da tela.
+
+Como ler os primeiros sinais:
+
+| Registro | O que investigar |
+| --- | --- |
+| `required_symbol_missing` / `gta_layout_mismatch` | A `libGTASA.so` em execução difere da analisada. |
+| `client_not_verified` | Biblioteca do cliente ausente, com outro nome, ou Build ID diferente. |
+| `hook_installed` e nenhum callback durante a partida | Função de desenho não executada ou hook substituído; o log sozinho não determina a causa. |
+| `players=0` com slots ocupados e `not_player` alto | A classificação `CPed::IsPlayer` pode não corresponder aos jogadores desse cliente. |
+| `missing_bone`, `no_hierarchy` ou `projection_failed` altos | Os candidatos foram encontrados, mas a caixa não passou pelas verificações. |
+| `drawn` e `polygon_calls` positivos sem imagem | O código chegou às chamadas de desenho; investigar estados gráficos, ordem de renderização ou sobreposição. Isso não comprova que a GPU exibiu as figuras. |
+
+Se **nenhum arquivo aparecer**, confira também as pastas alternativas. Pode ser que o AML não tenha carregado esta `.so`, que a dependência não tenha sido atendida ou que nenhum caminho tenha permitido gravação. Uma biblioteca que não foi carregada não consegue gerar seu próprio arquivo: nesse caso, é necessário o log do AML ou o logcat.
+
+Os testes simulados cobrem filtro de personagens, ossos ausentes, caixa e linha, clipping, identificação ELF e motivos de rejeição. Os testes de arquivo verificam fallback após falha de abertura, flush antes de fechar, gravações concorrentes e rotação. Esses testes não substituem a execução no celular. Nenhuma verificação de versão nem filtro de desenho foi removido nesta atualização.
 
 ## Compilar
 

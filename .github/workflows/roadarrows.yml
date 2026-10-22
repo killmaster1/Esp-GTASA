@@ -1,0 +1,43 @@
+name: Build Road Arrows ARM64
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'roadarrows/**'
+      - 'mod/**'
+      - '.github/workflows/roadarrows.yml'
+  pull_request:
+    paths:
+      - 'roadarrows/**'
+      - 'mod/**'
+      - '.github/workflows/roadarrows.yml'
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test routing and game integration with simulated memory
+        run: |
+          g++ -std=c++14 -D__aarch64__ -Iroadarrows/tests/host -I. roadarrows/tests/navigation_test.cpp -ldl -o /tmp/roadarrows-test
+          /tmp/roadarrows-test
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
+      - run: sdkmanager 'ndk;27.2.12479018'
+      - name: Configure
+        run: >-
+          cmake -S roadarrows -B build-roadarrows
+          -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake"
+          -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-23
+          -DANDROID_STL=c++_static -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build-roadarrows --parallel 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoadArrows-ARM64
+          path: build-roadarrows/libroadarrows.so
+          if-no-files-found: error

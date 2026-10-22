@@ -34,6 +34,8 @@ jobs:
           /tmp/sampesp-render-hook-test
           g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/penetration_test.cpp -ldl -pthread -o /tmp/sampesp-penetration-test
           /tmp/sampesp-penetration-test
+          g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/cadence_test.cpp -ldl -pthread -o /tmp/sampesp-cadence-test
+          /tmp/sampesp-cadence-test
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'

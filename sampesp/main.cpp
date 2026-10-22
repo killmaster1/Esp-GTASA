@@ -10,8 +10,9 @@
 #include "sniper_aim.h"
 #include "render_hook.h"
 #include "sniper_penetration.h"
+#include "sniper_cadence.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.5, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.6, Custom)
 // AML calls below exist since 1.0.1 or earlier; allow the reported AML 1.3.1.
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.3.1)
@@ -78,7 +79,7 @@ void initializeLog(){
         }
     }
     auto path=fileLog.filename();
-    fileLog.write("===== Alyn ESP 0.3.5 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+    fileLog.write("===== Alyn ESP 0.3.6 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
 }
 struct FrameStats {
     const char* reason="scanned";
@@ -98,6 +99,7 @@ struct FrameReport {
         fileLog.write("FRAME reason=%s screen=%.0fx%.0f slots=%d free=%d null=%d self=%d not_player=%d players=%d no_rw=%d dead=%d other_area=%d too_far=%d bad_position=%d drawn=%d polygon_calls=%d",
             stats.reason,width,height,stats.slots,stats.free,stats.nullPed,stats.self,stats.notPlayer,stats.players,stats.noRw,stats.dead,stats.area,stats.range,stats.badPos,stats.drawn,stats.quads);
         fileLog.write("FEATURES box=%d line=%d health=%d synced_health=%d unknown_health=%d ui=removed",int(options::boxEnabled.load()),int(options::lineEnabled.load()),int(options::healthEnabled.load()),stats.syncedHealth,stats.unknownHealth);
+        fileLog.write("CADENCE hooks=%u shots_adjusted=%llu original_ms=%u reduced_ms=%u",cadence::installed,(unsigned long long)cadence::adjusted.load(),cadence::lastOriginalMs.load(),cadence::lastReducedMs.load());
         fileLog.write("PENETRATION installed=%d enabled=%d bullet_rays=%llu filtered_local_sniper=%llu filtered_hits=%llu",int(penetration::installed),int(options::penetrationEnabled.load()),(unsigned long long)penetration::rays.load(),(unsigned long long)penetration::filtered.load(),(unsigned long long)penetration::hits.load());
         fileLog.write("SNIPER installed=%d enabled=%d zoom=%d scoped=%d mode=%d weapon=%d target_id=%d fov=%.3f",int(sniper::installed),int(options::aimEnabled.load()),int(options::zoomEnabled.load()),int(sniper::scoped.load()),sniper::reportedMode.load(),sniper::reportedWeapon.load(),sniper::lockedId.load(),sniper::reportedFov.load());
         fileLog.write("FILTER no_hierarchy=%d bad_hierarchy=%d missing_bone=%d sample_tag=%d sample_index=%d sample_node_count=%d invalid_bone_position=%d stale_bone=%d projection_failed=%d sample_depth=%.3f invalid_box=%d offscreen=%d ped_types_0_to_6=%d,%d,%d,%d,%d,%d,%d other_types=%d",
@@ -284,8 +286,9 @@ extern "C" JNIEXPORT void OnAllModsLoaded(){
     fileLog.write("RENDER Idle BL installed; original=0x%llx; Render2dStuff entry left untouched",(unsigned long long)reinterpret_cast<uintptr_t>(original2D));
     sniper::install(aml,handle,base,log);
     penetration::install(aml,handle,base,log);
+    cadence::install(aml,handle,base,log);
     phase="hook_installed";
-    log("Alyn ESP 0.3.5 ready; hook installed; waiting for first render callback and matching client");
+    log("Alyn ESP 0.3.6 ready; hook installed; waiting for first render callback and matching client");
 }
 
 extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

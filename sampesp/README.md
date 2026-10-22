@@ -1,6 +1,14 @@
-# Alyn Player ESP 0.3.5 — ARM64 / AML
+# Alyn Player ESP 0.3.6 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
+
+## Cadência nominal da sniper em 2x (0.3.6)
+
+Após um disparo válido da sniper local, o intervalo restante para o próximo tiro é reduzido à metade. Exemplo: 1000 ms passa a 500 ms. A redução ocorre uma vez por disparo, incluindo o temporizador de recarga iniciado ao esvaziar o pente. Não altera dano nem munição, não gera tiros extras e não afeta outras armas ou jogadores. Uma recarga manual separada não é acelerada.
+
+Usa os pontos de chamada de `CWeapon::Fire` em `CTaskSimpleUseGun::FireGun` (`0x5dff14`, instrução `0x97f1229f`) e `CTaskSimplePlayerOnFoot::ProcessPlayerWeapon` (`0x6536ec`, `0x97ef54a9`), através de `AML::HookBL`. A entrada de `Fire` é preservada. O DWARF confirma `CWeapon` de 32 bytes com tipo em 0, estado em 4, munição em 8/12 e temporizador em 16. O ajuste ocorre depois do retorno original bem-sucedido, somente se houve consumo de munição e o estado é disparando ou recarregando. O contador de tempo do jogo é `CTimer::m_snTimeInMilliseconds` em `0xbdc558`.
+
+O log inclui `CADENCE hooks`, `shots_adjusted`, `original_ms` e `reduced_ms`. Esses valores permitem conferir se o caminho é usado pelo APK e a redução aplicada. A cadência real ainda depende de limites adicionais de animação, controles e servidor. Os testes cobrem redução única, munição preservada, disparo falho, filtro de arma/dono, último tiro do pente e overflow do relógio. O funcionamento no aparelho ainda precisa ser validado.
 
 ## Sniper atravessando o cenário (0.3.5, experimental)
 

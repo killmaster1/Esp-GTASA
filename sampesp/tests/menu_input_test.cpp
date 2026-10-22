@@ -14,7 +14,7 @@ bool begin(const char* title,bool* open,int flags){++roots;return ImGui::Begin(t
 bool button(const char* title,const clientui::Vec2& size){bool clicked=ImGui::Button(title,{size.x,size.y});controls[title]={ImGui::GetItemRectMin(),ImGui::GetItemRectMax()};return clicked;}
 void pos(const clientui::Vec2& p,int condition,const clientui::Vec2& pivot){ImGui::SetNextWindowPos({p.x,p.y},condition,{pivot.x,pivot.y});}
 void size(const clientui::Vec2& s,int condition){ImGui::SetNextWindowSize({s.x,s.y},condition);}
-void text(const char* value,const char* end){if(std::string(value)=="ALYN ESP 0.2.1")visiblePanel=true;ImGui::TextUnformatted(value,end);}
+void text(const char* value,const char* end){if(std::string(value)=="ALYN ESP 0.3.0")visiblePanel=true;ImGui::TextUnformatted(value,end);}
 void frame(){
     controls.clear();roots=0;visiblePanel=false;ImGui::NewFrame();clientui::endFrame();ImGui::Render();
     assert(roots==1);assert(ImGui::GetCurrentContext()->ColorStack.Size==0);assert(ImGui::GetCurrentContext()->StyleVarStack.Size==0);
@@ -39,6 +39,8 @@ int main(){
     for(int i=0;i<3;++i)frame();assert(visiblePanel&&controls.count("ESP BOX: LIGADO")&&!controls.count("MENU ESP"));
     assert(ImGui::GetDrawData()->CmdListsCount>0&&ImGui::GetDrawData()->TotalVtxCount>0);
     tap("ESP BOX: LIGADO");assert(!clientui::boxEnabled&&clientui::lineEnabled&&clientui::healthEnabled&&clientui::menuOpen);
+    tap("TRAVA SNIPER: LIGADO");assert(!clientui::aimEnabled&&!clientui::boxEnabled&&clientui::lineEnabled);
+    tap("ZOOM ESTENDIDO: LIGADO");assert(!clientui::zoomEnabled&&!clientui::aimEnabled);
     tap("FECHAR MENU");assert(!clientui::menuOpen&&!clientui::boxEnabled);for(int i=0;i<3;++i)frame();assert(controls.count("MENU ESP"));
     tap("MENU ESP");for(int i=0;i<3;++i)frame();assert(clientui::menuOpen&&visiblePanel&&!clientui::boxEnabled&&controls.count("ESP BOX: DESLIGADO"));
     ImGui::DestroyContext();std::cout<<"Real ImGui touch test passed: open, draw panel, toggle box, close, reopen\n";

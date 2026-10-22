@@ -1,6 +1,14 @@
-# Alyn Player ESP 0.2.1 — ARM64 / AML
+# Alyn Player ESP 0.3.0 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
+
+## Sniper na 0.3.0
+
+- **TRAVA SNIPER**: ao abrir a luneta com a sniper equipada, escolhe o jogador válido mais próximo do centro da mira e acompanha a parte superior do tronco. Solte a mira para adquirir outro alvo. Considera obstáculos do cenário e a vida sincronizada.
+- **ZOOM ESTENDIDO**: os controles normais da luneta passam a percorrer FOV de 70° até 1°. O alcance continua limitado à renderização atual do mapa e aos jogadores carregados pelo cliente.
+- As duas opções iniciam ligadas e podem ser desligadas separadamente no menu. A atuação é suspensa enquanto o menu está aberto.
+
+Detalhes, limites e análise das funções nativas: [SNIPER.md](SNIPER.md).
 
 ## Abertura do menu na 0.2.1
 

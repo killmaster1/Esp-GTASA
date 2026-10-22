@@ -28,6 +28,8 @@ jobs:
           /tmp/sampesp-log-test
           g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/features_test.cpp -ldl -pthread -o /tmp/sampesp-features-test
           /tmp/sampesp-features-test
+          g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/sniper_test.cpp -ldl -pthread -o /tmp/sampesp-sniper-test
+          /tmp/sampesp-sniper-test
       - name: Checkout ImGui 1.92.8 for real input test
         uses: actions/checkout@v4
         with:

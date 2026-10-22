@@ -10,7 +10,7 @@
 namespace clientui {
 struct Vec2 {float x,y;};
 struct Row {unsigned id;float hp,armour,distance;};
-std::atomic<bool> boxEnabled{true},lineEnabled{true},healthEnabled{true};
+std::atomic<bool> boxEnabled{true},lineEnabled{true},healthEnabled{true},aimEnabled{true},zoomEnabled{true};
 std::atomic<uint64_t> frames{0},panelFrames{0},openRequests{0};
 std::mutex rowsMutex;
 std::vector<Row> rows;
@@ -70,7 +70,7 @@ void render(){
     // the panel cannot activate an ESP option in that same submitted frame.
     const bool expanded=menuOpen.load();handledAction=false;
     float panelWidth=std::min(display.x-24*scale,380*scale);
-    float panelHeight=std::min(display.y*.78f,listOpen?600*scale:390*scale);
+    float panelHeight=std::min(display.y*.78f,listOpen?680*scale:530*scale);
     constexpr int baseFlags=1|2|4|32|256|(1<<16)|(1<<17);
     if(expanded){
         setPos({display.x*.5f,display.y*.56f},1,{.5f,.5f});
@@ -100,11 +100,13 @@ void render(){
                 if(event)event("UI_OPEN_REQUEST: MENU ESP pressed; panel scheduled for next frame; ESP options unchanged");
             }
         }else{
-            ++panelFrames;text("ALYN ESP 0.2.1",nullptr);
+            ++panelFrames;text("ALYN ESP 0.3.0",nullptr);
             Vec2 size{panelWidth-32*scale,48*scale};
             toggle(boxEnabled,"ESP BOX",size);
             toggle(healthEnabled,"BARRA DE VIDA",size);
             toggle(lineEnabled,"ESP LINE",size);
+            toggle(aimEnabled,"TRAVA SNIPER",size);
+            toggle(zoomEnabled,"ZOOM ESTENDIDO",size);
             if(activated(listOpen?"OCULTAR JOGADORES":"JOGADORES PROXIMOS",size))listOpen=!listOpen;
             if(listOpen){
                 std::vector<Row> snapshot;{std::lock_guard<std::mutex> lock(rowsMutex);snapshot=rows;}

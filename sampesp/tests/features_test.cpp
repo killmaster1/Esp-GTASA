@@ -19,7 +19,7 @@ void endMock(){assert(beginDepth>0);--beginDepth;}
 bool buttonMock(const char* label,const clientui::Vec2& size){assert(size.x>0&&size.y>=38);if(std::strncmp(label,"ESP BOX",7)==0||std::strncmp(label,"BARRA DE VIDA",13)==0||std::strncmp(label,"ESP LINE",8)==0)++optionCalls;if(allButtons)return true;if(click&&std::strcmp(label,click)==0){click=nullptr;return true;}return false;}
 void posMock(const clientui::Vec2&,int condition,const clientui::Vec2&){assert(condition==1);}
 void sizeMock(const clientui::Vec2&,int condition){assert(condition==1);}
-void textMock(const char* value,const char*){if(std::strcmp(value,"ALYN ESP 0.2.1")==0)++panelHeaders;}
+void textMock(const char* value,const char*){if(std::strcmp(value,"ALYN ESP 0.3.0")==0)++panelHeaders;}
 void focusMock(){++focusCalls;}
 void eventMock(const char* value){events.emplace_back(value);}
 void colorMock(int,unsigned){++colors;}void popColorMock(int n){colors-=n;assert(colors==0);}

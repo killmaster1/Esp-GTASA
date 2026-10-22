@@ -1,6 +1,7 @@
 #pragma once
 #include "player_health.h"
 #include "client_menu.h"
+#include "simple_menu.h"
 namespace features {
 health::Cache healthCache;
 void (*originalRemoteProcess)(void*)=nullptr;
@@ -25,25 +26,18 @@ void install(IAML* aml,uintptr_t base,void (*log)(const char*)){
     if(!std::memcmp(process,prologue,sizeof(prologue))&&aml->Hook(process,reinterpret_cast<void*>(processRemote),reinterpret_cast<void**>(&originalRemoteProcess))){
         healthInstalled=true;log("Synchronized remote health hook installed (CPed's synthetic 1000 HP is not used for the bar)");
     }else log("Remote health hook unavailable or entry changed; unsynchronized health bars stay gray");
-    void* handle=aml->GetLibHandle("libAlyn_SAMPMOBILE.so");
-    if(!handle){log("UI: client symbol handle unavailable");return;}
-    const char* names[]{"_ZN5ImGui10GetVersionEv","_ZN5ImGui8EndFrameEv","_ZN5ImGui17GetCurrentContextEv","_ZN5ImGui5GetIOEv","_ZN5ImGui13GetFrameCountEv",
-        "_ZN5ImGui5BeginEPKcPbi","_ZN5ImGui3EndEv","_ZN5ImGui6ButtonEPKcRK6ImVec2","_ZN5ImGui16SetNextWindowPosERK6ImVec2iS2_",
-        "_ZN5ImGui17SetNextWindowSizeERK6ImVec2i","_ZN5ImGui15TextUnformattedEPKcS1_","_ZN5ImGui14PushStyleColorEij","_ZN5ImGui13PopStyleColorEi",
-        "_ZN5ImGui12PushStyleVarEif","_ZN5ImGui11PopStyleVarEi","_ZN5ImGui18SetWindowFontScaleEf","_ZN5ImGui18SetNextWindowFocusEv"};
-    constexpr uintptr_t offsets[]{0x5c5e50,0x5d1140,0x5b7ec0,0x5c5e60,0x5c5f10,0x5ccf40,0x5d1f40,0x639e50,0x5d6d60,0x5ccf00,0x638900,0x5b8d40,0x5b8f40,0x5b91a0,0x5b9560,0x5d6f60,0x5dea70};
-    uintptr_t symbols[17]{};
-    for(int i=0;i<17;++i){symbols[i]=aml->GetSym(handle,names[i]);if(!symbols[i]||symbols[i]-base!=offsets[i]){log("UI symbols/layout differ; menu disabled, overlay remains available");return;}}
-    auto version=reinterpret_cast<const char*(*)()>(symbols[0]);
-    if(std::strcmp(version(),"1.92.8")){log("UI: unsupported ImGui version");return;}
-    clientui::context=reinterpret_cast<decltype(clientui::context)>(symbols[2]);clientui::io=reinterpret_cast<decltype(clientui::io)>(symbols[3]);
-    clientui::frameCount=reinterpret_cast<decltype(clientui::frameCount)>(symbols[4]);clientui::begin=reinterpret_cast<decltype(clientui::begin)>(symbols[5]);
-    clientui::end=reinterpret_cast<decltype(clientui::end)>(symbols[6]);clientui::button=reinterpret_cast<decltype(clientui::button)>(symbols[7]);
-    clientui::setPos=reinterpret_cast<decltype(clientui::setPos)>(symbols[8]);clientui::setSize=reinterpret_cast<decltype(clientui::setSize)>(symbols[9]);
-    clientui::text=reinterpret_cast<decltype(clientui::text)>(symbols[10]);clientui::color=reinterpret_cast<decltype(clientui::color)>(symbols[11]);
-    clientui::popColor=reinterpret_cast<decltype(clientui::popColor)>(symbols[12]);clientui::style=reinterpret_cast<decltype(clientui::style)>(symbols[13]);
-    clientui::popStyle=reinterpret_cast<decltype(clientui::popStyle)>(symbols[14]);clientui::fontScale=reinterpret_cast<decltype(clientui::fontScale)>(symbols[15]);clientui::focusNext=reinterpret_cast<decltype(clientui::focusNext)>(symbols[16]);clientui::event=log;
-    if(!aml->Hook(reinterpret_cast<void*>(symbols[1]),reinterpret_cast<void*>(clientui::endFrame),reinterpret_cast<void**>(&clientui::originalEndFrame))){log("UI EndFrame hook failed");return;}
-    clientui::installed=true;log("SA-style menu 0.2.1 installed: single-window MENU ESP launcher, box/line/health toggles and nearby player inspector");
+    simpleui::event=log;
+    struct Entry {uintptr_t offset;const char* bytes;void* callback;void** original;const char* label;};
+    const Entry entries[]{
+        {0x55acc0,"\xfd\x7b\xbe\xa9\xf4\x4f\x01\xa9\xfd\x03\x00\x91\xf3\x03\x00\xaa",reinterpret_cast<void*>(simpleui::submit),reinterpret_cast<void**>(&simpleui::originalSubmit),"CMD /alynesp"},
+        {0x5b3c60,"\x08\x94\x6e\x39\x08\x0c\x00\x34\xe9\x23\xbc\x6d\xfd\x7b\x01\xa9",reinterpret_cast<void*>(simpleui::mousePosition),reinterpret_cast<void**>(&simpleui::originalPosition),"TOUCH position"},
+        {0x5b3e00,"\x08\x94\x6e\x39\xe8\x12\x00\x34\xff\x43\x01\xd1\xfd\x7b\x01\xa9",reinterpret_cast<void*>(simpleui::mouseButton),reinterpret_cast<void**>(&simpleui::originalButton),"TOUCH button"}
+    };
+    for(const auto& entry:entries){
+        void* target=reinterpret_cast<void*>(base+entry.offset);
+        bool okay=!std::memcmp(target,entry.bytes,16)&&aml->Hook(target,entry.callback,entry.original);
+        char message[160];std::snprintf(message,sizeof(message),"SIMPLE_UI %s hook %s",entry.label,okay?"installed":"FAILED (entry changed or hook rejected)");log(message);
+    }
+    log("SIMPLE_UI 0.3.1 uses GTA drawing; legacy ImGui window hook disabled");
 }
 }

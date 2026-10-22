@@ -9,7 +9,7 @@
 #include "client_features.h"
 #include "sniper_aim.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.0, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.1, Custom)
 // AML calls below exist since 1.0.1 or earlier; allow the reported AML 1.3.1.
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.3.1)
@@ -76,7 +76,7 @@ void initializeLog(){
         }
     }
     auto path=fileLog.filename();
-    fileLog.write("===== Alyn ESP 0.3.0 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+    fileLog.write("===== Alyn ESP 0.3.1 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
 }
 struct FrameStats {
     const char* reason="scanned";
@@ -98,6 +98,7 @@ struct FrameReport {
         fileLog.write("FRAME reason=%s screen=%.0fx%.0f slots=%d free=%d null=%d self=%d not_player=%d players=%d no_rw=%d dead=%d other_area=%d too_far=%d bad_position=%d drawn=%d polygon_calls=%d",
             stats.reason,width,height,stats.slots,stats.free,stats.nullPed,stats.self,stats.notPlayer,stats.players,stats.noRw,stats.dead,stats.area,stats.range,stats.badPos,stats.drawn,stats.quads);
         fileLog.write("FEATURES box=%d line=%d health=%d synced_health=%d unknown_health=%d gui_frames=%llu menu_open=%d open_requests=%llu panel_frames=%llu",int(clientui::boxEnabled.load()),int(clientui::lineEnabled.load()),int(clientui::healthEnabled.load()),stats.syncedHealth,stats.unknownHealth,(unsigned long long)clientui::frames.load(),int(clientui::menuOpen.load()),(unsigned long long)clientui::openRequests.load(),(unsigned long long)clientui::panelFrames.load());
+        fileLog.write("SIMPLE_UI commands=%llu presses=%llu native_font=%d",(unsigned long long)simpleui::commandCount.load(),(unsigned long long)simpleui::touchCount.load(),int(simpleui::fontReady));
         fileLog.write("SNIPER installed=%d enabled=%d zoom=%d scoped=%d mode=%d weapon=%d target_id=%d fov=%.3f",int(sniper::installed),int(clientui::aimEnabled.load()),int(clientui::zoomEnabled.load()),int(sniper::scoped.load()),sniper::reportedMode.load(),sniper::reportedWeapon.load(),sniper::lockedId.load(),sniper::reportedFov.load());
         fileLog.write("FILTER no_hierarchy=%d bad_hierarchy=%d missing_bone=%d sample_tag=%d sample_index=%d sample_node_count=%d invalid_bone_position=%d stale_bone=%d projection_failed=%d sample_depth=%.3f invalid_box=%d offscreen=%d ped_types_0_to_6=%d,%d,%d,%d,%d,%d,%d other_types=%d",
             stats.noHierarchy,stats.badHierarchy,stats.missingBone,stats.missingTag,stats.missingIndex,stats.nodeCount,stats.badBonePos,stats.staleBone,stats.projection,stats.failedDepth,stats.badBox,stats.offscreen,
@@ -162,6 +163,9 @@ void rectangle(float left,float top,float right,float bottom,Color color){
     if(currentStats)++currentStats->quads;
     polygon(left,top,right,top,left,bottom,right,bottom,color);
 }
+void uiRectangle(float left,float top,float right,float bottom,simpleui::Color color){
+    rectangle(left,top,right,bottom,{color.r,color.g,color.b,color.a});
+}
 void drawHealth(Box box,bool known,float value,float scale){
     float right=box.left-4*scale,left=right-4*scale;
     rectangle(left-scale,box.top-scale,right+scale,box.bottom+scale,{0,0,0,220});
@@ -220,6 +224,7 @@ void draw(){
     stats.slots=pool->size;
     width=read<int>(screen,8);height=read<int>(screen,12);
     if(width<1||height<1||width>32768||height>32768){stats.reason="invalid_screen_size";return;}
+    simpleui::frame(width,height);
     Vec origin=position(self);if(!esp::finite(origin)){stats.reason="invalid_local_position";return;}
     int drawn=0;
     for(int i=0;i<pool->size&&drawn<maxDrawn;++i){
@@ -274,9 +279,11 @@ extern "C" JNIEXPORT void OnAllModsLoaded(){
     poolPtr=reinterpret_cast<Pool**>(symbols[7]);screen=reinterpret_cast<uint8_t*>(symbols[8]);
     hierarchyFromClump=reinterpret_cast<decltype(hierarchyFromClump)>(symbols[9]);boneIndex=reinterpret_cast<decltype(boneIndex)>(symbols[10]);
     if(!aml->Hook(reinterpret_cast<void*>(symbols[0]),reinterpret_cast<void*>(draw),reinterpret_cast<void**>(&original2D))){phase="render_hook_failed";log("2D render hook failed; disabled");return;}
+    simpleui::event=log;simpleui::rect=uiRectangle;
+    simpleui::installFont(aml,handle,base);
     sniper::install(aml,handle,base,log);
     phase="hook_installed";
-    log("Alyn ESP 0.3.0 ready; hook installed; waiting for first render callback and matching client");
+    log("Alyn ESP 0.3.1 ready; hook installed; waiting for first render callback and matching client");
 }
 
 extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

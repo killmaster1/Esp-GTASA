@@ -1,4 +1,4 @@
-# Alyn Player ESP 0.3.0 — ARM64 / AML
+# Alyn Player ESP 0.3.1 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
 
@@ -10,20 +10,36 @@ Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com
 
 Detalhes, limites e análise das funções nativas: [SNIPER.md](SNIPER.md).
 
-## Abertura do menu na 0.2.1
+## Botão simples e comando local na 0.3.1
 
-O botão agora se chama **MENU ESP**. A mesma janela se expande para mostrar o painel e solicita foco ao abrir. O lançamento do menu é processado em um quadro e o painel no próximo, sem encaminhar esse toque às opções de caixa, linha ou vida. **FECHAR MENU** recolhe o painel sem alterar as opções. Só uma ação de controle é aceita por quadro.
+Substitui a janela ImGui pelo botão azul **MENU TESTE**, no alto ao centro, e um painel desenhado com `CSprite2d` + `CFont` do GTA. A legenda **ALYN 0.3.1 - /alynesp** identifica a versão nova. O botão apenas abre ou fecha o painel; não liga o ESP. O painel conserva controles separados para caixa, linha, vida, trava da sniper, zoom e consulta de jogadores com paginação.
 
-A mudança responde ao relato de que o botão não abria o menu. O comportamento exato no aparelho ainda precisa de confirmação; não foi identificada uma proteção que impedisse janelas. Há novos registros em `alyn_esp.log`: `UI_OPEN_REQUEST`, `UI_WINDOW mode=PANEL visible=...`, `UI_CLOSE_REQUEST` e contadores `menu_open`, `open_requests`, `panel_frames`.
+No chat do SA-MP:
 
-Além dos testes simulados, há um teste com Dear ImGui 1.92.8 real, fixado no commit `8936b58fe26e8c3da834b8f60b06511d537b4c63`, que injeta eventos normais de posição/pressionamento/liberação e verifica abrir, desenhar o painel, desligar a caixa, fechar e reabrir. O teste roda no host e não substitui o teste no backend Android do cliente.
+```text
+/alynesp                 abre o menu (repetir mantém aberto)
+/alynesp fechar          fecha
+/alynesp teste           mostra confirmação visual
+/alynesp box on          liga a caixa
+/alynesp box off         desliga a caixa
+/alynesp linha off       desliga a linha
+/alynesp vida off        desliga a barra
+/alynesp aim off         desliga a trava
+/alynesp zoom off        desliga o zoom estendido
+```
+
+Todas as opções aceitam `on` e `off`. Os comandos desse namespace são interceptados na fila local do teclado; não são registrados como comandos de servidor. O ciclo normal de envio recebe uma string vazia para finalizar o teclado; o tratamento desse envio vazio ainda precisa de teste no cliente. Comandos de outros nomes e mensagens normais passam sem alteração e não são gravados no log. Não usa o comando `/esp`, que poderia conflitar com o servidor.
+
+`alyn_esp.log` registra `SIMPLE_UI CMD /alynesp hook installed`, `TOUCH position/button hook installed`, `CMD RECEBIDO`, `TOQUE` e contadores `commands`, `presses`, `panel_frames`. Se o comando funcionar e o botão não, esses contadores ajudam a separar falha de entrada e de desenho. As assinaturas, entradas e layout de strings foram conferidos na biblioteca enviada. Há testes de fila, strings curtas/longas, passagem de chat, desenho, toque duplicado, seleção e opções. O APK Android ainda exige teste no aparelho.
+
+O código da janela anterior e seus testes permanecem como referência; o hook `EndFrame` não é instalado na 0.3.1.
 
 ## Novidades da 0.2.0
 
 - Barra vertical de vida à esquerda do ESP Box, preenchida de baixo para cima usando a vida sincronizada do cliente Alyn. A vida interna de 1000 usada pelo GTA para os remotos não é usada nessa barra.
 - Cores: **verde acima de 75**, **amarelo acima de 50 até 75**, **laranja acima de 25 até 50**, **vermelho de 0 a 25**. Cinza indica falta de um valor sincronizado recente. A referência de preenchimento é 100; números maiores continuam disponíveis na lista.
-- Botão **MENU ESP** no alto, ao centro, com tema inspirado em San Andreas. Abre controles separados para **ESP Box**, **Barra de vida** e **ESP Line**. Desligar a caixa também oculta a barra; a linha tem controle independente. As opções valem durante a sessão e voltam ligadas ao reiniciar.
-- Lista **Jogadores próximos**, ordenada por distância, com ID e vida. Toque em uma linha para mostrar também o colete. A seleção é somente para consulta, sem ação de dano.
+- Na versão original, botão **MENU ESP** no alto, ao centro, com tema inspirado em San Andreas. Abre controles separados para **ESP Box**, **Barra de vida** e **ESP Line**. Desligar a caixa também oculta a barra; a linha tem controle independente. As opções valem durante a sessão e voltam ligadas ao reiniciar.
+- Lista **Jogadores próximos**, ordenada por distância, com ID e vida. Selecione uma linha para mostrar também o colete. A seleção é somente para consulta, sem ação de dano.
 - Mantém o arquivo de diagnóstico e a dependência mínima AML 1.3.1.
 
 Detalhes da análise, offsets específicos e limites das conclusões sobre dano: [ANALISE.md](ANALISE.md).
@@ -45,7 +61,7 @@ Requer AML 1.3.1 ou superior carregado pelo APK do SA-MP, além das bibliotecas 
 - Não testa oclusão por paredes. Alvos parcialmente fora da tela têm as linhas recortadas antes do desenho.
 - Só funciona com personagens que já estejam carregados no cliente. Não revela jogadores fora do streaming, não consulta posições no servidor e não altera pacotes de rede.
 - A seleção usa `CPed::IsPlayer` do GTA (tipos 0 e 1), e não uma lista de IDs extraída de `CPlayerPool` do SA-MP. Bots ou personagens de outros mods classificados como jogadores pelo GTA também podem aparecer; isso precisa ser conferido no servidor usado.
-- O menu usa a interface ImGui já presente no cliente. Não mostra nomes e não altera a mira. O toque e eventuais conflitos com controles ou janelas existentes precisam de teste no aparelho.
+- O menu usa desenho e fonte do GTA. O toque é observado nos eventos de entrada do ImGui do cliente, sem depender de janelas ImGui. Não bloqueia controles subjacentes; possíveis conflitos precisam de teste no aparelho. O comando local oferece um caminho independente do toque.
 
 ## Compatibilidade analisada
 

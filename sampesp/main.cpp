@@ -10,7 +10,7 @@
 #include "sniper_aim.h"
 #include "render_hook.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.2, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.3, Custom)
 // AML calls below exist since 1.0.1 or earlier; allow the reported AML 1.3.1.
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.3.1)
@@ -77,7 +77,7 @@ void initializeLog(){
         }
     }
     auto path=fileLog.filename();
-    fileLog.write("===== Alyn ESP 0.3.2 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+    fileLog.write("===== Alyn ESP 0.3.3 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
 }
 struct FrameStats {
     const char* reason="scanned";
@@ -291,7 +291,7 @@ extern "C" JNIEXPORT void OnAllModsLoaded(){
     simpleui::installFont(aml,handle,base);
     sniper::install(aml,handle,base,log);
     phase="hook_installed";
-    log("Alyn ESP 0.3.2 ready; hook installed; waiting for first render callback and matching client");
+    log("Alyn ESP 0.3.3 ready; hook installed; waiting for first render callback and matching client");
 }
 
 extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

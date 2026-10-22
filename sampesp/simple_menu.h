@@ -20,8 +20,11 @@ void (*print)(float,float,uint16_t*)=nullptr;
 void (*flush)()=nullptr;
 void* details=nullptr;
 void (*fontScale)(float)=nullptr;
-void (*fontColor)(Color)=nullptr;
-void (*dropColor)(Color)=nullptr;
+// These exported by-value CRGBA functions receive an indirect argument in the
+// game's C++ ABI: both read RGBA with LDRB w9,[x0]. A trivial four-byte local
+// struct passed by value would put RGBA bits into w0 and crash on dereference.
+void (*fontColor)(const Color*)=nullptr;
+void (*dropColor)(const Color*)=nullptr;
 void (*orientation)(uint8_t)=nullptr;
 void (*fontStyle)(uint8_t)=nullptr;
 void (*edge)(int8_t)=nullptr;
@@ -71,7 +74,7 @@ void mouseButton(void* io,int button,bool down){
 void runCommand(const std::string& value){
     if(value=="/alynesp"){clientui::menuOpen=true;++clientui::openRequests;notify("CMD RECEBIDO - MENU ABERTO");return;}
     if(value=="/alynesp fechar"){clientui::menuOpen=false;notify("CMD RECEBIDO - MENU FECHADO");return;}
-    if(value=="/alynesp teste"){notify("ALYN 0.3.2 - COMANDO FUNCIONANDO");return;}
+    if(value=="/alynesp teste"){notify("ALYN 0.3.3 - COMANDO FUNCIONANDO");return;}
     const char* names[]{"box","linha","vida","aim","zoom"};
     std::atomic<bool>* options[]{&clientui::boxEnabled,&clientui::lineEnabled,&clientui::healthEnabled,&clientui::aimEnabled,&clientui::zoomEnabled};
     for(int i=0;i<5;++i)for(int on=0;on<2;++on){
@@ -120,8 +123,10 @@ void frame(float width,float height){
     }
     uint8_t saved[64]{};
     if(fontReady){
-        std::memcpy(saved,details,64);fontStyle(1);fontScale(.47f*height/600.f);alpha(255);fontColor({240,230,205,255});
-        dropColor({0,0,0,255});edge(1);shadow(0);background(0,0);proportional(1);justify(0);orientation(0);centre(width);slant(0);
+        std::memcpy(saved,details,64);fontStyle(1);fontScale(.47f*height/600.f);alpha(255);
+        const Color textColor{240,230,205,255},shadowColor{0,0,0,255};
+        fontColor(&textColor);
+        dropColor(&shadowColor);edge(1);shadow(0);background(0,0);proportional(1);justify(0);orientation(0);centre(width);slant(0);
     }
     auto box=[&](float l,float top,float r,float bottom,Color c){rect(l*width/800,top*height/600,r*width/800,bottom*height/600,c);};
     auto text=[&](float x,float y,const char* s){label(x*width/800,y*height/600,s);};
@@ -129,7 +134,7 @@ void frame(float width,float height){
     box(310,34,490,77,{30,95,150,255});text(400,42,"MENU TESTE");
     if(clientui::menuOpen){
         ++clientui::panelFrames;
-        box(215,90,585,520,{12,14,18,245});text(400,103,clientui::listOpen?"JOGADORES / VOLTAR":"ALYN ESP 0.3.2");
+        box(215,90,585,520,{12,14,18,245});text(400,103,clientui::listOpen?"JOGADORES / VOLTAR":"ALYN ESP 0.3.3");
         if(!clientui::listOpen){
             const char* names[]{"ESP BOX","ESP LINE","BARRA DE VIDA","TRAVA SNIPER","ZOOM ESTENDIDO"};
             std::atomic<bool>* options[]{&clientui::boxEnabled,&clientui::lineEnabled,&clientui::healthEnabled,&clientui::aimEnabled,&clientui::zoomEnabled};
@@ -144,7 +149,7 @@ void frame(float width,float height){
         }
         button(468,"FECHAR MENU");
     }
-    text(400,551,"ALYN 0.3.2 - /alynesp");
+    text(400,551,"ALYN 0.3.3 - /alynesp");
     if(diagnostics::millis()<bannerUntil){box(100,577,700,599,{20,65,40,245});text(400,577,banner.c_str());}
     if(fontReady){flush();std::memcpy(details,saved,64);}
 }
@@ -154,6 +159,6 @@ void installFont(IAML* aml,void* handle,uintptr_t base){
     uintptr_t symbols[16]{};for(int i=0;i<16;++i){symbols[i]=aml->GetSym(handle,names[i]);if(symbols[i]!=base+offsets[i]){if(event)event("SIMPLE_UI CFont layout mismatch; text disabled");return;}}
     print=reinterpret_cast<decltype(print)>(symbols[0]);flush=reinterpret_cast<decltype(flush)>(symbols[1]);details=reinterpret_cast<void*>(symbols[2]);
     fontScale=reinterpret_cast<decltype(fontScale)>(symbols[3]);fontColor=reinterpret_cast<decltype(fontColor)>(symbols[4]);dropColor=reinterpret_cast<decltype(dropColor)>(symbols[5]);orientation=reinterpret_cast<decltype(orientation)>(symbols[6]);fontStyle=reinterpret_cast<decltype(fontStyle)>(symbols[7]);edge=reinterpret_cast<decltype(edge)>(symbols[8]);shadow=reinterpret_cast<decltype(shadow)>(symbols[9]);background=reinterpret_cast<decltype(background)>(symbols[10]);proportional=reinterpret_cast<decltype(proportional)>(symbols[11]);justify=reinterpret_cast<decltype(justify)>(symbols[12]);centre=reinterpret_cast<decltype(centre)>(symbols[13]);alpha=reinterpret_cast<decltype(alpha)>(symbols[14]);slant=reinterpret_cast<decltype(slant)>(symbols[15]);fontReady=true;
-    if(event)event("SIMPLE_UI native GTA font ready");
+    if(event)event("SIMPLE_UI native GTA font ready; SetColor/SetDropColor use indirect CRGBA arguments");
 }
 }

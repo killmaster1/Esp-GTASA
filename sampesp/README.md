@@ -1,6 +1,14 @@
-# Alyn Player ESP 0.3.2 — ARM64 / AML
+# Alyn Player ESP 0.3.3 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
+
+## Correção do crash na cor do texto (0.3.3)
+
+Os logs enviados confirmam a 0.3.2 carregada e mostram um crash diferente: `SIGSEGV` em `CFont::SetColor + 4` (`libGTASA + 0x6cee10`), chamado por `simpleui::frame`. O registrador `x0` contém `0xffcde6f0`, exatamente os bytes RGBA da cor do texto `{240,230,205,255}`. A instrução nesse ponto é `ldrb w9,[x0]`: a função espera o endereço da cor, mas a declaração anterior passava os quatro bytes como um inteiro. O mesmo padrão de acesso existe em `SetDropColor`.
+
+A 0.3.3 corrige as duas chamadas para receberem um ponteiro a uma cor local válida. A forma de passagem foi conferida no código ARM64 das funções; o nome C++ exportado, que mostra CRGBA por valor, não basta para reproduzir essa ABI com uma estrutura trivial. O desenho e os comandos continuam disponíveis. A integração pelo `BL` de `Idle`, introduzida na 0.3.2, é mantida.
+
+O teste do menu agora executa também com `fontReady=true`, cobrindo as duas cores por ponteiro, a ordem da configuração de alpha, o texto do botão e do painel, o flush e a restauração dos 64 bytes de configurações da fonte. Anteriormente esse caminho não era exercitado. Compilar e passar nos testes do host não confirma o funcionamento no APK; a nova biblioteca ainda precisa de teste no aparelho.
 
 ## Correção do crash SIGILL na 0.3.2
 
@@ -22,7 +30,7 @@ Detalhes, limites e análise das funções nativas: [SNIPER.md](SNIPER.md).
 
 ## Botão simples e comando local na 0.3.1
 
-Substitui a janela ImGui pelo botão azul **MENU TESTE**, no alto ao centro, e um painel desenhado com `CSprite2d` + `CFont` do GTA. A legenda identifica a versão carregada (**ALYN 0.3.2** na correção atual). O botão apenas abre ou fecha o painel; não liga o ESP. O painel conserva controles separados para caixa, linha, vida, trava da sniper, zoom e consulta de jogadores com paginação.
+Substitui a janela ImGui pelo botão azul **MENU TESTE**, no alto ao centro, e um painel desenhado com `CSprite2d` + `CFont` do GTA. A legenda identifica a versão carregada (**ALYN 0.3.3** na correção atual). O botão apenas abre ou fecha o painel; não liga o ESP. O painel conserva controles separados para caixa, linha, vida, trava da sniper, zoom e consulta de jogadores com paginação.
 
 No chat do SA-MP:
 

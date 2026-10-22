@@ -7,9 +7,10 @@
 #include "overlay_math.h"
 #include "diagnostics.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.1.1, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.1.2, Custom)
+// AML calls below exist since 1.0.1 or earlier; allow the reported AML 1.3.1.
 BEGIN_DEPLIST()
-    ADD_DEPENDENCY_VER(net.rusjj.aml, 1.4.0)
+    ADD_DEPENDENCY_VER(net.rusjj.aml, 1.3.1)
 END_DEPLIST()
 namespace {
 using esp::Vec;using esp::Point;using esp::Box;
@@ -72,7 +73,7 @@ void initializeLog(){
         }
     }
     auto path=fileLog.filename();
-    fileLog.write("===== Alyn ESP 0.1.1 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+    fileLog.write("===== Alyn ESP 0.1.2 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
 }
 struct FrameStats {
     const char* reason="scanned";
@@ -244,7 +245,7 @@ extern "C" JNIEXPORT void OnAllModsLoaded(){
     hierarchyFromClump=reinterpret_cast<decltype(hierarchyFromClump)>(symbols[9]);boneIndex=reinterpret_cast<decltype(boneIndex)>(symbols[10]);
     if(!aml->Hook(reinterpret_cast<void*>(symbols[0]),reinterpret_cast<void*>(draw),reinterpret_cast<void**>(&original2D))){phase="render_hook_failed";log("2D render hook failed; disabled");return;}
     phase="hook_installed";
-    log("Alyn ESP 0.1.1 ready; hook installed; waiting for first render callback and matching client");
+    log("Alyn ESP 0.1.2 ready; hook installed; waiting for first render callback and matching client");
 }
 
 extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

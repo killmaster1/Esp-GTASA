@@ -1,4 +1,4 @@
-# Alyn Player ESP 0.1.1 — ARM64 / AML
+# Alyn Player ESP 0.1.2 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
 
@@ -8,7 +8,7 @@ Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com
 2. Extraia `libsampesp.so` e coloque na pasta de mods do AML usada pelo seu APK, com o jogo fechado.
 3. Abra o cliente Alyn e entre no servidor.
 
-Requer AML 1.4.0 ou superior carregado pelo APK do SA-MP, além das bibliotecas compatíveis abaixo. Apenas colocar a `.so` no aparelho não instala o AML. Não substitua `libGTASA.so` nem `libAlyn_SAMPMOBILE.so`. Para desativar, remova somente `libsampesp.so` com o jogo fechado.
+Requer AML 1.3.1 ou superior carregado pelo APK do SA-MP, além das bibliotecas compatíveis abaixo. Apenas colocar a `.so` no aparelho não instala o AML. Não substitua `libGTASA.so` nem `libAlyn_SAMPMOBILE.so`. Para desativar, remova somente `libsampesp.so` com o jogo fechado.
 
 ## Comportamento
 
@@ -28,6 +28,22 @@ Cliente enviado: `libAlyn_SAMPMOBILE.so`, ELF AArch64, NDK r27b, Android API 24.
 GTA: a `libGTASA.so` 2.10 ARM64 enviada anteriormente, SHA-256 `92b3714534742cf8e31eba35dbfd5e83871ecb5b936f5519d9b6ef3562234f9e`. As estruturas do GTA foram verificadas nos dados DWARF. O mod confere os símbolos e seus endereços relativos e aguarda o cliente com o Build ID indicado. Outro GTA ou outra compilação Alyn exige nova análise.
 
 O cliente tem os símbolos internos de jogadores removidos; esta versão não usa offsets presumidos de `CNetGame` ou `CPlayerPool`. A biblioteca original do cliente não é modificada nem distribuída neste projeto.
+
+## Correção da dependência AML (0.1.2)
+
+O `.ini` enviado indica `Version=1.3.1`. As versões 0.1.0 e 0.1.1 declaravam AML 1.4.0 como mínimo, o que pode fazer o carregador rejeitar o mod antes dos callbacks e da criação de `alyn_esp.log`. A 0.1.2 aceita AML 1.3.1: `GetSym`, `Hook` e `GetConfigPath` existem desde 1.0.0.0; `GetDataPath` desde 1.0.0.4; `GetAndroidDataPath` desde 1.0.0.5; `GetLibHandle` desde 1.0.1, conforme os cabeçalhos AML usados. A compatibilidade efetiva no APK ainda deve ser conferida no aparelho.
+
+Para habilitar também o log do carregador, com o jogo fechado, edite **somente estas entradas existentes** da seção `[Preferences]` do `.ini` do AML:
+
+```ini
+PrintLogsToFile=1
+PrintLogsToFile_NoLogCat=0
+PrintLogsToFile_Verbose=1
+```
+
+Mantenha `EnableLogcats=1` e `DontLoadMods=0`, que já estão assim no arquivo enviado. Não altere manualmente `Version=1.3.1`: isso não atualiza a biblioteca AML. Reinicie o cliente após trocar a `.so` e salvar o `.ini`.
+
+Se ainda não houver `alyn_esp.log`, envie os arquivos de log gerados pelo AML e o caminho completo onde `libsampesp.so` foi colocado. O `.ini` pode ser antigo, então seu conteúdo sozinho não comprova a versão efetivamente carregada.
 
 ## Diagnóstico por arquivo (0.1.1)
 

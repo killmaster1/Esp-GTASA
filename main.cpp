@@ -5,7 +5,7 @@
 #include <cmath>
 #include <cstddef>
 
-MYMOD(local.npclines.sa210, NPC Lines SA210 ARM64, 0.1.0, Custom)
+MYMOD(local.npclines.sa210, NPC Lines SA210 ARM64, 0.1.1, Custom)
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.4.0)
 END_DEPLIST()
@@ -21,7 +21,9 @@ void (*originalHud)() = nullptr;
 void* (*findPlayer)(int) = nullptr;
 void* (*getPed)(int) = nullptr;
 bool (*project)(const Vec&, Vec*, float*, float*, bool, bool) = nullptr;
-void (*triangle)(float*, float*, const Color&) = nullptr;
+// Static Draw2DPolygon: eight float arguments in FP registers, color in x0.
+// DrawTriangle is an instance method and cannot be called with this ABI.
+void (*polygon)(float, float, float, float, float, float, float, float, const Color&) = nullptr;
 Pool** poolPtr = nullptr;
 uint8_t* screen = nullptr;
 constexpr float maxDistance = 100.0f;
@@ -42,9 +44,10 @@ void line(float x0, float y0, float x1, float y1) {
     float len=std::sqrt(dx*dx+dy*dy);
     if (!std::isfinite(len) || len < 1.0f) return;
     float nx=-dy/len*thickness*0.5f, ny=dx/len*thickness*0.5f;
-    float ax[3]{x0+nx,x0-nx,x1+nx}, ay[3]{y0+ny,y0-ny,y1+ny};
-    float bx[3]{x1+nx,x0-nx,x1-nx}, by[3]{y1+ny,y0-ny,y1-ny};
-    triangle(ax,ay,color); triangle(bx,by,color);
+    // SetVertices emits corners in order 3,4,2,1 for the triangle fan.
+    // Supply the two ends as pairs to form a rectangle without crossed edges.
+    polygon(x0+nx,y0+ny, x0-nx,y0-ny,
+            x1+nx,y1+ny, x1-nx,y1-ny, color);
 }
 void drawHud() {
     originalHud();
@@ -81,8 +84,8 @@ extern "C" JNIEXPORT void OnAllModsLoaded() {
     if (!handle) { log("libGTASA not loaded; disabled"); return; }
     const char* names[]{"_ZN4CHud4DrawEv","_Z13FindPlayerPedi","_ZN6CPools6GetPedEi",
       "_ZN7CSprite15CalcScreenCoorsERK5RwV3dPS0_PfS4_bb",
-      "_ZN9CSprite2d12DrawTriangleEPfS0_RK5CRGBA","_ZN6CPools11ms_pPedPoolE","RsGlobal"};
-    constexpr uintptr_t offsets[]{0x51f6f0,0x4efae0,0x4f2378,0x6e9df8,0x6ed858,0xbc3bb8,0xc9b320};
+      "_ZN9CSprite2d13Draw2DPolygonEffffffffRK5CRGBA","_ZN6CPools11ms_pPedPoolE","RsGlobal"};
+    constexpr uintptr_t offsets[]{0x51f6f0,0x4efae0,0x4f2378,0x6e9df8,0x6ee4a4,0xbc3bb8,0xc9b320};
     uintptr_t symbols[7]{};
     for (int i=0;i<7;++i) {
         symbols[i]=aml->GetSym(handle,names[i]);
@@ -95,11 +98,11 @@ extern "C" JNIEXPORT void OnAllModsLoaded() {
     findPlayer=reinterpret_cast<decltype(findPlayer)>(symbols[1]);
     getPed=reinterpret_cast<decltype(getPed)>(symbols[2]);
     project=reinterpret_cast<decltype(project)>(symbols[3]);
-    triangle=reinterpret_cast<decltype(triangle)>(symbols[4]);
+    polygon=reinterpret_cast<decltype(polygon)>(symbols[4]);
     poolPtr=reinterpret_cast<Pool**>(symbols[5]);
     screen=reinterpret_cast<uint8_t*>(symbols[6]);
     if (!aml->Hook(reinterpret_cast<void*>(symbols[0]),reinterpret_cast<void*>(drawHud),reinterpret_cast<void**>(&originalHud))) {
         log("HUD hook failed; disabled"); return;
     }
-    log("NPC Lines enabled: ARM64, 100m, max 128 lines");
+    log("NPC Lines 0.1.1 enabled: ARM64, 100m, max 128 lines");
 }

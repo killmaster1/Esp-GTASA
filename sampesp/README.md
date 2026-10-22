@@ -1,6 +1,14 @@
-# Alyn Player ESP 0.3.4 — ARM64 / AML
+# Alyn Player ESP 0.3.5 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
+
+## Sniper atravessando o cenário (0.3.5, experimental)
+
+A rotina local de colisão das balas da sniper do jogador passa a ignorar construções, objetos e dummies. Personagens e veículos continuam na consulta. Ativa automaticamente no cliente compatível, sem menu. O dano nativo da arma, munição, tempo de vida da bala, efeitos e processamento de acerto permanecem os originais. Não altera o servidor nem cria envios artificiais de dano.
+
+A implementação ignora essas categorias por completo; não calcula espessura nem reduz dano pela parede. O alcance continua dependente da bala nativa e do streaming. A trava automática da sniper continua exigindo linha de visão para adquirir um alvo; essa versão muda a colisão do disparo. O efeito no dano de jogadores remotos depende da validação do servidor.
+
+Análise, ponto de instalação e diagnóstico em [PENETRACAO.md](PENETRACAO.md). Os testes são simulados e a biblioteca foi compilada localmente com NDK r27c. Ainda exige validação no APK.
 
 ## Versão 0.3.4 sem menu
 

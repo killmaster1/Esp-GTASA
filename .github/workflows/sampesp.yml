@@ -32,6 +32,8 @@ jobs:
           /tmp/sampesp-sniper-test
           g++ -std=c++14 sampesp/tests/render_hook_test.cpp -o /tmp/sampesp-render-hook-test
           /tmp/sampesp-render-hook-test
+          g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/penetration_test.cpp -ldl -pthread -o /tmp/sampesp-penetration-test
+          /tmp/sampesp-penetration-test
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'

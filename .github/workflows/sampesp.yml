@@ -36,6 +36,8 @@ jobs:
           /tmp/sampesp-penetration-test
           g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/cadence_test.cpp -ldl -pthread -o /tmp/sampesp-cadence-test
           /tmp/sampesp-cadence-test
+          g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/damage_test.cpp -ldl -pthread -o /tmp/sampesp-damage-test
+          /tmp/sampesp-damage-test
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'

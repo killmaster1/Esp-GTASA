@@ -1,6 +1,14 @@
-# Alyn Player ESP 0.3.6 — ARM64 / AML
+# Alyn Player ESP 0.3.7 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
+
+## Dano da sniper em personagens em 3× (0.3.7)
+
+O dano base dos impactos nativos da sniper local contra personagens é multiplicado por três. Exemplo: 100 passa a 300, antes dos modificadores normais do jogo. Mantém cadência nominal 2×, penetração, ESP e ausência de menu. Não muda dano de veículos/objetos, outras armas ou disparos de outros jogadores. O servidor continua podendo recalcular ou rejeitar dano remoto.
+
+Intercepta apenas a chamada nativa de `CBulletInfo::Update` para `CWeapon::GenerateDamageEvent` em `0x6fc8a0`, instrução `0x97ec753c`, preservando a entrada da função. Confere os símbolos e aplica o multiplicador somente com cliente verificado, dono igual ao jogador local, arma 34 e valor positivo. Encaminha uma única chamada original com os mesmos alvo, dono, parte do corpo e direção, preservando o retorno. Não implementa RPCs, tiros extras ou escrita direta na vida. Não modifica os slots da bala, evitando multiplicação repetida ao atravessar vários quadros. Valores que estourariam `int` são limitados ao máximo positivo.
+
+O log `DAMAGE` contém instalação, multiplicador, impactos ajustados e último valor base/final. Os testes verificam 3×, uma chamada por impacto, parâmetros/retorno, tipos de arma/dono, cliente não verificado, zero/negativos e overflow. Exige validação no aparelho.
 
 ## Cadência nominal da sniper em 2x (0.3.6)
 

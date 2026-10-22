@@ -25,6 +25,6 @@ void install(IAML* aml,uintptr_t base,void (*log)(const char*)){
     if(!std::memcmp(process,prologue,sizeof(prologue))&&aml->Hook(process,reinterpret_cast<void*>(processRemote),reinterpret_cast<void**>(&originalRemoteProcess))){
         healthInstalled=true;log("Synchronized remote health hook installed (CPed's synthetic 1000 HP is not used for the bar)");
     }else log("Remote health hook unavailable or entry changed; unsynchronized health bars stay gray");
-    log("Features 0.3.6: automatic operation; menu, font, touch and chat hooks removed");
+    log("Features 0.3.7: automatic operation; menu, font, touch and chat hooks removed");
 }
 }

@@ -8,8 +8,9 @@
 #include "diagnostics.h"
 #include "client_features.h"
 #include "sniper_aim.h"
+#include "render_hook.h"
 
-MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.1, Custom)
+MYMOD(local.sampesp.alyn.arm64, Alyn Player ESP ARM64, 0.3.2, Custom)
 // AML calls below exist since 1.0.1 or earlier; allow the reported AML 1.3.1.
 BEGIN_DEPLIST()
     ADD_DEPENDENCY_VER(net.rusjj.aml, 1.3.1)
@@ -76,7 +77,7 @@ void initializeLog(){
         }
     }
     auto path=fileLog.filename();
-    fileLog.write("===== Alyn ESP 0.3.1 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
+    fileLog.write("===== Alyn ESP 0.3.2 diagnostic session; ABI=arm64-v8a log=%s =====",path.empty()?"LOGCAT ONLY (no writable AML path)":path.c_str());
 }
 struct FrameStats {
     const char* reason="scanned";
@@ -202,7 +203,10 @@ bool playerBox(void* ped,Vec center,Box& box){
 }
 void draw(){
     ++renderFrames;
+    phase="calling_original_2d";
+    if(!original2D){log("RENDER original callback missing; drawing skipped");return;}
     original2D();
+    phase="original_2d_returned";
     FrameReport report;auto& stats=report.stats;
     if(!sampReady){
         phase="waiting_for_client";
@@ -278,12 +282,16 @@ extern "C" JNIEXPORT void OnAllModsLoaded(){
     project=reinterpret_cast<decltype(project)>(symbols[5]);polygon=reinterpret_cast<decltype(polygon)>(symbols[6]);
     poolPtr=reinterpret_cast<Pool**>(symbols[7]);screen=reinterpret_cast<uint8_t*>(symbols[8]);
     hierarchyFromClump=reinterpret_cast<decltype(hierarchyFromClump)>(symbols[9]);boneIndex=reinterpret_cast<decltype(boneIndex)>(symbols[10]);
-    if(!aml->Hook(reinterpret_cast<void*>(symbols[0]),reinterpret_cast<void*>(draw),reinterpret_cast<void**>(&original2D))){phase="render_hook_failed";log("2D render hook failed; disabled");return;}
+    uint32_t call=read<uint32_t>(reinterpret_cast<void*>(base+renderhook::callOffset),0);
+    uint64_t entry0=read<uint64_t>(reinterpret_cast<void*>(symbols[0]),0),entry8=read<uint64_t>(reinterpret_cast<void*>(symbols[0]),8),entry16=read<uint64_t>(reinterpret_cast<void*>(symbols[0]),16);
+    fileLog.write("RENDER install=Idle_BL call_offset=0x4d9108 instruction=0x%08x entry_words=%016llx,%016llx,%016llx",call,(unsigned long long)entry0,(unsigned long long)entry8,(unsigned long long)entry16);
+    if(!renderhook::install(aml,base,reinterpret_cast<void*>(draw),reinterpret_cast<void**>(&original2D))){phase="render_hook_failed";log("RENDER Idle BL hook failed or call changed; no entry-hook fallback; disabled");return;}
+    fileLog.write("RENDER Idle BL installed; original=0x%llx; Render2dStuff entry left untouched",(unsigned long long)reinterpret_cast<uintptr_t>(original2D));
     simpleui::event=log;simpleui::rect=uiRectangle;
     simpleui::installFont(aml,handle,base);
     sniper::install(aml,handle,base,log);
     phase="hook_installed";
-    log("Alyn ESP 0.3.1 ready; hook installed; waiting for first render callback and matching client");
+    log("Alyn ESP 0.3.2 ready; hook installed; waiting for first render callback and matching client");
 }
 
 extern "C" JNIEXPORT void OnModUnload(){watchdog.stop();log("CALLBACK OnModUnload reached");}

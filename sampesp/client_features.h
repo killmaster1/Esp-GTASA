@@ -38,6 +38,6 @@ void install(IAML* aml,uintptr_t base,void (*log)(const char*)){
         bool okay=!std::memcmp(target,entry.bytes,16)&&aml->Hook(target,entry.callback,entry.original);
         char message[160];std::snprintf(message,sizeof(message),"SIMPLE_UI %s hook %s",entry.label,okay?"installed":"FAILED (entry changed or hook rejected)");log(message);
     }
-    log("SIMPLE_UI 0.3.1 uses GTA drawing; legacy ImGui window hook disabled");
+    log("SIMPLE_UI 0.3.2 uses GTA drawing; legacy ImGui window hook disabled");
 }
 }

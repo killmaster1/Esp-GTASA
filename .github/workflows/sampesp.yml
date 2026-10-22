@@ -32,6 +32,8 @@ jobs:
           /tmp/sampesp-sniper-test
           g++ -std=c++14 -D__aarch64__ -Isampesp/tests/host -I. sampesp/tests/simple_menu_test.cpp -ldl -pthread -o /tmp/sampesp-simple-menu-test
           /tmp/sampesp-simple-menu-test
+          g++ -std=c++14 sampesp/tests/render_hook_test.cpp -o /tmp/sampesp-render-hook-test
+          /tmp/sampesp-render-hook-test
       - name: Checkout ImGui 1.92.8 for real input test
         uses: actions/checkout@v4
         with:

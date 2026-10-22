@@ -1,6 +1,16 @@
-# Alyn Player ESP 0.3.1 — ARM64 / AML
+# Alyn Player ESP 0.3.2 — ARM64 / AML
 
 Biblioteca experimental com ESP Box e ESP Line juntos. Desenha caixas verdes com contorno preto sobre os personagens identificados pelo GTA como jogadores e linhas do centro inferior da tela até as caixas. Ativa automaticamente quando o cliente Alyn compatível está carregado.
+
+## Correção do crash SIGILL na 0.3.2
+
+O crash relatado na 0.3.1 ocorreu em `libGTASA.so + 0x4d89a4` (`Render2dStuff + 0x10`), durante o retorno do trampoline chamado pelo mod, antes do desenho do painel. A pilha inclui o wrapper Alyn `+0x47de10`, o mod e a entrada do GTA. O endereço é compatível com sobreposição entre patches na entrada, embora o log não contenha os bytes da instrução para provar qual patch estava presente. Não é evidência de proteção contra desenhos, nem de falta de arquivos de textura.
+
+A 0.3.2 remove o nosso hook da entrada de `Render2dStuff`. Intercepta somente o `BL` em `Idle + 0x4d9108`, cujo destino original é `Render2dStuff` e cujo retorno é `+0x4d910c`. Usa `AML::HookBL`, disponível desde AML 1.0.4, preservando a entrada usada pelo cliente. A instrução esperada é `0x97fffe23`; se mudou ou o hook for rejeitado, desativa a integração e registra o motivo, sem voltar ao hook de entrada.
+
+O botão e os comandos da 0.3.1 são mantidos, agora identificados como **ALYN 0.3.2**. O diagnóstico inclui `RENDER install=Idle_BL`, bytes da entrada antes da instalação, resultado do hook e fase `calling_original_2d` / `original_2d_returned`. O teste isolado verifica a instrução e que a entrada permanece intacta, inclusive quando já contém um patch. Isso não substitui a validação no aparelho.
+
+**Force a parada completa do jogo antes de substituir `libsampesp.so` e inicie um processo novo**; trocar o arquivo com o processo aberto não desfaz os patches da versão anterior.
 
 ## Sniper na 0.3.0
 
@@ -12,7 +22,7 @@ Detalhes, limites e análise das funções nativas: [SNIPER.md](SNIPER.md).
 
 ## Botão simples e comando local na 0.3.1
 
-Substitui a janela ImGui pelo botão azul **MENU TESTE**, no alto ao centro, e um painel desenhado com `CSprite2d` + `CFont` do GTA. A legenda **ALYN 0.3.1 - /alynesp** identifica a versão nova. O botão apenas abre ou fecha o painel; não liga o ESP. O painel conserva controles separados para caixa, linha, vida, trava da sniper, zoom e consulta de jogadores com paginação.
+Substitui a janela ImGui pelo botão azul **MENU TESTE**, no alto ao centro, e um painel desenhado com `CSprite2d` + `CFont` do GTA. A legenda identifica a versão carregada (**ALYN 0.3.2** na correção atual). O botão apenas abre ou fecha o painel; não liga o ESP. O painel conserva controles separados para caixa, linha, vida, trava da sniper, zoom e consulta de jogadores com paginação.
 
 No chat do SA-MP:
 

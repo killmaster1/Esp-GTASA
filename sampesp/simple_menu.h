@@ -71,7 +71,7 @@ void mouseButton(void* io,int button,bool down){
 void runCommand(const std::string& value){
     if(value=="/alynesp"){clientui::menuOpen=true;++clientui::openRequests;notify("CMD RECEBIDO - MENU ABERTO");return;}
     if(value=="/alynesp fechar"){clientui::menuOpen=false;notify("CMD RECEBIDO - MENU FECHADO");return;}
-    if(value=="/alynesp teste"){notify("ALYN 0.3.1 - COMANDO FUNCIONANDO");return;}
+    if(value=="/alynesp teste"){notify("ALYN 0.3.2 - COMANDO FUNCIONANDO");return;}
     const char* names[]{"box","linha","vida","aim","zoom"};
     std::atomic<bool>* options[]{&clientui::boxEnabled,&clientui::lineEnabled,&clientui::healthEnabled,&clientui::aimEnabled,&clientui::zoomEnabled};
     for(int i=0;i<5;++i)for(int on=0;on<2;++on){
@@ -129,7 +129,7 @@ void frame(float width,float height){
     box(310,34,490,77,{30,95,150,255});text(400,42,"MENU TESTE");
     if(clientui::menuOpen){
         ++clientui::panelFrames;
-        box(215,90,585,520,{12,14,18,245});text(400,103,clientui::listOpen?"JOGADORES / VOLTAR":"ALYN ESP 0.3.1");
+        box(215,90,585,520,{12,14,18,245});text(400,103,clientui::listOpen?"JOGADORES / VOLTAR":"ALYN ESP 0.3.2");
         if(!clientui::listOpen){
             const char* names[]{"ESP BOX","ESP LINE","BARRA DE VIDA","TRAVA SNIPER","ZOOM ESTENDIDO"};
             std::atomic<bool>* options[]{&clientui::boxEnabled,&clientui::lineEnabled,&clientui::healthEnabled,&clientui::aimEnabled,&clientui::zoomEnabled};
@@ -144,7 +144,7 @@ void frame(float width,float height){
         }
         button(468,"FECHAR MENU");
     }
-    text(400,551,"ALYN 0.3.1 - /alynesp");
+    text(400,551,"ALYN 0.3.2 - /alynesp");
     if(diagnostics::millis()<bannerUntil){box(100,577,700,599,{20,65,40,245});text(400,577,banner.c_str());}
     if(fontReady){flush();std::memcpy(details,saved,64);}
 }
